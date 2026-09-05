@@ -1,0 +1,148 @@
+@import "tailwindcss";
+
+:root {
+  --background: #ffffff;
+  --foreground: #2c1810;
+  --primary: #8b5e3c;
+  --primary-light: #c4956a;
+  --primary-dark: #6b4226;
+  --secondary: #f5e6d3;
+  --accent: #d4a574;
+  --muted: #f8f4f0;
+  --border: #e8ddd3;
+  --success: #22c55e;
+  --warning: #f59e0b;
+  --error: #ef4444;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-primary: var(--primary);
+  --color-primary-light: var(--primary-light);
+  --color-primary-dark: var(--primary-dark);
+  --color-secondary: var(--secondary);
+  --color-accent: var(--accent);
+  --color-muted: var(--muted);
+  --color-border: var(--border);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-error: var(--error);
+  --font-sans: var(--font-inter);
+  --font-serif: var(--font-playfair);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+}
+
+/* Keep buttons, nav, inputs, and small UI text in sans-serif */
+button, input, select, textarea, nav, label, span, a, p, li {
+  font-family: var(--font-sans), Arial, sans-serif;
+}
+
+/* Headings use Playfair Display serif font */
+h1, h2, h3 {
+  font-family: var(--font-serif), Georgia, serif;
+}
+
+
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--muted);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--primary-light);
+}
+
+/* Custom focus styles */
+*:focus-visible {
+  outline: none;
+}
+
+/* Smooth scrolling */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Custom button hover effect */
+.btn-primary {
+  @apply bg-primary text-white px-6 py-3 rounded-lg font-medium transition-all duration-200 hover:bg-primary-dark hover:shadow-lg active:scale-95;
+}
+
+.btn-secondary {
+  @apply bg-secondary text-primary px-6 py-3 rounded-lg font-medium transition-all duration-200 hover:bg-accent hover:text-white active:scale-95;
+}
+
+.btn-outline {
+  @apply border-2 border-primary text-primary px-6 py-3 rounded-lg font-medium transition-all duration-200 hover:bg-primary hover:text-white active:scale-95;
+}
+
+/* Card styles */
+.card {
+  @apply bg-white rounded-xl shadow-sm border border-border p-6 transition-shadow duration-200 hover:shadow-md;
+}
+
+/* Input styles - plain CSS to avoid Tailwind v4 layer conflicts */
+.input {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  font-size: 1rem;
+  line-height: 1.5;
+  color: var(--foreground);
+  background-color: white;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.input::placeholder {
+  color: var(--foreground);
+  opacity: 0.4;
+}
+.input:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(139, 94, 60, 0.2);
+  border-color: var(--primary);
+}
+.input-icon {
+  padding-left: 2.75rem;
+}
+
+.input-error {
+  @apply border-error focus:ring-error/20 focus:border-error;
+}
+
+/* Badge styles */
+.badge {
+  @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+}
+
+.badge-success {
+  @apply bg-green-100 text-green-800;
+}
+
+.badge-warning {
+  @apply bg-yellow-100 text-yellow-800;
+}
+
+.badge-error {
+  @apply bg-red-100 text-red-800;
+}
+
+.badge-info {
+  @apply bg-blue-100 text-blue-800;
+}
