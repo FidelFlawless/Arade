@@ -7,8 +7,8 @@ import { Lock, Loader2, CreditCard, ShoppingBag } from "lucide-react";
 import { useCart } from "@/components/providers/CartProvider";
 import { useAuth } from "@/components/providers/AuthProvider";
 import { createClient } from "@/lib/supabase/client";
-import { formatPrice, calculateDeliveryFee } from "@/lib/utils";
-import { CANADIAN_PROVINCES, US_STATES, FREE_DELIVERY_THRESHOLD } from "@/lib/constants";
+import { formatPrice } from "@/lib/utils";
+import { CANADIAN_PROVINCES, US_STATES } from "@/lib/constants";
 
 interface ShippingForm {
   first_name: string;
@@ -52,15 +52,32 @@ export default function CheckoutPage() {
       setForm(prev => ({ ...prev, email: user.email || "", first_name: profile?.first_name || "", last_name: profile?.last_name || "" }));
       const loadAddresses = async () => {
         setLoadingAddresses(true);
-        const { data } = await supabase.from("addresses").select("*").eq("user_id", user.id).order("is_default", { ascending: false });
+        const res = await fetch("/api/addresses");
+        const data = res.ok ? await res.json() : [];
         setSavedAddresses(data || []);
         setLoadingAddresses(false);
-        const def = data?.find((a: any) => a.is_default);
+        const def = data?.find((a: any) => a.is_default) || data?.[0];
         if (def) setForm(prev => ({ ...prev, first_name: def.first_name || prev.first_name, last_name: def.last_name || prev.last_name, address_line1: def.address_line1 || "", address_line2: def.address_line2 || "", city: def.city || "", province_state: def.province_state || "", postal_code: def.postal_code || "", country: def.country || "CA" }));
       };
       loadAddresses();
     }
   }, [user, profile, supabase]);
+
+  const [storeSettings, setStoreSettings] = useState({
+    free_delivery_threshold: 180,
+    delivery_fee_cad: 9.99,
+    delivery_fee_usd: 7.99,
+  });
+
+  useEffect(() => {
+    fetch("/api/settings").then((r) => r.json()).then((data) => {
+      setStoreSettings({
+        free_delivery_threshold: Number(data.free_delivery_threshold) || 180,
+        delivery_fee_cad: Number(data.delivery_fee_cad) || 9.99,
+        delivery_fee_usd: Number(data.delivery_fee_usd) || 7.99,
+      });
+    }).catch(() => {});
+  }, []);
 
   const currency = form.country === "CA" ? "CAD" : "USD";
   const priceKey = currency === "CAD" ? "price_cad" : "price_usd";
@@ -69,7 +86,11 @@ export default function CheckoutPage() {
     (sum, item) => sum + item[priceKey] * item.quantity,
     0
   );
-  const deliveryFee = calculateDeliveryFee(subtotal, currency);
+  const deliveryFee = subtotal >= storeSettings.free_delivery_threshold
+    ? 0
+    : currency === "CAD"
+      ? storeSettings.delivery_fee_cad
+      : storeSettings.delivery_fee_usd;
   const total = subtotal + deliveryFee;
 
   const provinces = form.country === "CA" ? CANADIAN_PROVINCES : US_STATES;
@@ -86,6 +107,7 @@ export default function CheckoutPage() {
     if (!form.city.trim()) newErrors.city = "City is required";
     if (!form.province_state) newErrors.province_state = "Province/State is required";
     if (!form.postal_code.trim()) newErrors.postal_code = "Postal/ZIP code is required";
+    if (!form.phone.trim()) newErrors.phone = "Phone number is required";
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -97,10 +119,9 @@ export default function CheckoutPage() {
 
     setLoading(true);
     try {
-      // TODO: Connect to API route to create Stripe checkout session
-      // For now, simulate the process
+      // TODO: Connect to Stripe checkout
       await new Promise((resolve) => setTimeout(resolve, 2000));
-      alert("Checkout functionality will be connected in Phase 5!");
+      alert("Payment will be available soon. Stripe integration coming next!");
     } catch {
       alert("An error occurred. Please try again.");
     } finally {
@@ -145,8 +166,8 @@ export default function CheckoutPage() {
                     }
                     className="input"
                   >
-                    <option value="CA">🇨🇦 Canada</option>
-                    <option value="US">🇺🇸 United States</option>
+                    <option value="CA">Canada</option>
+                    <option value="US">United States</option>
                   </select>
                 </div>
 
@@ -190,8 +211,8 @@ export default function CheckoutPage() {
                     <label className="block text-sm font-medium text-foreground mb-2">
                       Email *
                     </label>
-                    <input
-                      type="email"
+                    <input                       type="email"
+                       suppressHydrationWarning
                       value={form.email}
                       onChange={(e) => updateForm("email", e.target.value)}
                       className={`input ${errors.email ? "input-error" : ""}`}
@@ -203,15 +224,16 @@ export default function CheckoutPage() {
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-foreground mb-2">
-                      Phone
+                      Phone *
                     </label>
                     <input
                       type="tel"
                       value={form.phone}
                       onChange={(e) => updateForm("phone", e.target.value)}
-                      className="input"
+                      className={`input ${errors.phone ? "border-red-500" : ""}`}
                       placeholder="+1 (555) 123-4567"
                     />
+                    {errors.phone && <p className="text-xs text-red-600 mt-1">{errors.phone}</p>}
                   </div>
                 </div>
 
@@ -315,7 +337,7 @@ export default function CheckoutPage() {
               ) : (
                 <>
                   <Lock className="w-5 h-5" />
-                  Place Order — {formatPrice(total, currency)}
+                  Place Order - {formatPrice(total, currency)}
                 </>
               )}
             </button>
@@ -366,7 +388,7 @@ export default function CheckoutPage() {
               {deliveryFee > 0 && (
                 <p className="text-xs text-foreground/50">
                   Free delivery on orders over{" "}
-                  {formatPrice(FREE_DELIVERY_THRESHOLD, currency)}
+                  {formatPrice(storeSettings.free_delivery_threshold, currency)}
                 </p>
               )}
             </div>

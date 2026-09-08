@@ -17,7 +17,7 @@ export default function ShopPage() {
     const loadData = async () => {
       const [prodsRes, catsRes] = await Promise.all([
         supabase.from("products").select("*, categories(name, slug)").eq("is_active", true),
-        supabase.from("categories").select("*").order("name"),
+        supabase.from("categories").select("*").not("parent_category_id", "is", null).order("name"),
       ]);
       setAllProducts(prodsRes.data || []);
       setCategories(catsRes.data || []);

@@ -1,25 +1,59 @@
 "use client";
 
-import { useState } from "react";
-import { Mail, Phone, MapPin, Clock, Send, Loader2 } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Mail, Phone, MapPin, Clock, Send, Loader2, CheckCircle } from "lucide-react";
+
+interface Settings {
+  store_email: string;
+  store_phone: string;
+  store_address: string;
+  business_hours: string;
+}
+
+const defaultSettings: Settings = {
+  store_email: "Fideliarufus35@gmail.com",
+  store_phone: "+1 (437) 566-2773",
+  store_address: "Ontario\nCanada",
+  business_hours: "Mon - Fri: 9:00 AM - 6:00 PM EST\nSat: 10:00 AM - 4:00 PM EST\nSun: Closed",
+};
 
 export default function ContactPage() {
-  const [form, setForm] = useState({
-    name: "",
-    email: "",
-    subject: "",
-    message: "",
-  });
+  const [settings, setSettings] = useState<Settings>(defaultSettings);
+  const [form, setForm] = useState({ name: "", email: "", subject: "", message: "" });
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    fetch("/api/settings")
+      .then((r) => r.json())
+      .then((data) => {
+        setSettings({
+          store_email: data.store_email || defaultSettings.store_email,
+          store_phone: data.store_phone || defaultSettings.store_phone,
+          store_address: data.store_address || defaultSettings.store_address,
+          business_hours: data.business_hours || defaultSettings.business_hours,
+        });
+      })
+      .catch(() => {});
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
-    // TODO: Connect to API route or email service
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    const newErrors: Record<string, string> = {};
+    if (!form.name.trim()) newErrors.name = "Name is required";
+    if (!form.email.trim()) newErrors.email = "Email is required";
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) newErrors.email = "Invalid email address";
+    if (!form.subject.trim()) newErrors.subject = "Subject is required";
+    if (!form.message.trim()) newErrors.message = "Message is required";
+    if (Object.keys(newErrors).length > 0) { setErrors(newErrors); return; }
+    setErrors({});
+
+    const whatsappNumber = "14375662773";
+    const msg = `Hello Arade,\n\nName: ${form.name}\nEmail: ${form.email}\n\nSubject: ${form.subject}\n\nMessage:\n${form.message}`;
+    const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(msg)}`;
+    window.open(whatsappUrl, "_blank");
     setSubmitted(true);
-    setLoading(false);
   };
 
   return (
@@ -47,7 +81,7 @@ export default function ContactPage() {
             </div>
             <div>
               <p className="font-medium text-foreground">Email</p>
-              <p className="text-foreground/60">support@glowskin.com</p>
+              <p className="text-foreground/60">{settings.store_email}</p>
             </div>
           </div>
 
@@ -57,7 +91,7 @@ export default function ContactPage() {
             </div>
             <div>
               <p className="font-medium text-foreground">Phone</p>
-              <p className="text-foreground/60">+1 (800) 555-GLOW</p>
+              <p className="text-foreground/60">{settings.store_phone}</p>
             </div>
           </div>
 
@@ -67,13 +101,7 @@ export default function ContactPage() {
             </div>
             <div>
               <p className="font-medium text-foreground">Address</p>
-              <p className="text-foreground/60">
-                123 Beauty Lane
-                <br />
-                Toronto, ON M5V 2T6
-                <br />
-                Canada
-              </p>
+              <p className="text-foreground/60 whitespace-pre-line">{settings.store_address}</p>
             </div>
           </div>
 
@@ -83,13 +111,7 @@ export default function ContactPage() {
             </div>
             <div>
               <p className="font-medium text-foreground">Business Hours</p>
-              <p className="text-foreground/60">
-                Mon - Fri: 9:00 AM - 6:00 PM EST
-                <br />
-                Sat: 10:00 AM - 4:00 PM EST
-                <br />
-                Sun: Closed
-              </p>
+              <p className="text-foreground/60 whitespace-pre-line">{settings.business_hours}</p>
             </div>
           </div>
         </div>
@@ -98,13 +120,12 @@ export default function ContactPage() {
         <div className="lg:col-span-2">
           {submitted ? (
             <div className="card text-center py-12">
-              <div className="text-5xl mb-4">✅</div>
+              <CheckCircle className="w-12 h-12 text-green-500 mx-auto mb-4" strokeWidth={1.5} />
               <h3 className="text-xl font-bold text-foreground mb-2">
-                Message Sent!
+                Message Sent via WhatsApp!
               </h3>
               <p className="text-foreground/60 mb-6">
-                Thank you for reaching out. We&apos;ll get back to you within 24
-                hours.
+                Thank you for reaching out. Your message has been sent to our WhatsApp. We&apos;ll get back to you shortly.
               </p>
               <button
                 onClick={() => {
@@ -133,10 +154,10 @@ export default function ContactPage() {
                       onChange={(e) =>
                         setForm({ ...form, name: e.target.value })
                       }
-                      required
-                      className="input"
+                      className={`input ${errors.name ? "border-red-500" : ""}`}
                       placeholder="John Doe"
                     />
+                    {errors.name && <p className="text-xs text-red-600 mt-1">{errors.name}</p>}
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-foreground mb-2">
@@ -144,14 +165,15 @@ export default function ContactPage() {
                     </label>
                     <input
                       type="email"
+                      suppressHydrationWarning
                       value={form.email}
                       onChange={(e) =>
                         setForm({ ...form, email: e.target.value })
                       }
-                      required
-                      className="input"
+                      className={`input ${errors.email ? "border-red-500" : ""}`}
                       placeholder="john@example.com"
                     />
+                    {errors.email && <p className="text-xs text-red-600 mt-1">{errors.email}</p>}
                   </div>
                 </div>
 
@@ -165,10 +187,10 @@ export default function ContactPage() {
                     onChange={(e) =>
                       setForm({ ...form, subject: e.target.value })
                     }
-                    required
-                    className="input"
+                    className={`input ${errors.subject ? "border-red-500" : ""}`}
                     placeholder="How can we help?"
                   />
+                  {errors.subject && <p className="text-xs text-red-600 mt-1">{errors.subject}</p>}
                 </div>
 
                 <div>
@@ -180,11 +202,11 @@ export default function ContactPage() {
                     onChange={(e) =>
                       setForm({ ...form, message: e.target.value })
                     }
-                    required
                     rows={5}
-                    className="input resize-none"
+                    className={`input resize-none ${errors.message ? "border-red-500" : ""}`}
                     placeholder="Tell us more about your question or concern..."
                   />
+                  {errors.message && <p className="text-xs text-red-600 mt-1">{errors.message}</p>}
                 </div>
 
                 <button

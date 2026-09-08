@@ -89,7 +89,7 @@ export default function CollectionPage() {
               </p>
             </div>
             <div className="relative flex justify-end items-center -mr-4 sm:-mr-8 lg:-mr-0">
-              <img src="/hero-product.png" alt="Arade Collection" className="w-full max-w-[380px] lg:max-w-[520px] h-auto object-contain mix-blend-multiply" style={{maskImage:"linear-gradient(to right,transparent 0%,black 15%)",WebkitMaskImage:"linear-gradient(to right,transparent 0%,black 15%)"}} />
+              <img src="/image.png" alt="Arade Collection" className="w-full max-w-[380px] lg:max-w-[520px] h-auto object-contain mix-blend-multiply" style={{maskImage:"linear-gradient(to right,transparent 0%,black 15%)",WebkitMaskImage:"linear-gradient(to right,transparent 0%,black 15%)"}} />
             </div>
           </div>
         </div>

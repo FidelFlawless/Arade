@@ -16,18 +16,18 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   title: {
-    default: "Arade — Luxury in every glow Products",
+    default: "Arade - Beauty, Skincare, Hair & Fashion",
     template: "%s | Arade",
   },
   description:
-    "Professional skincare products for radiant, healthy skin. Shop cleansers, moisturizers, serums, and more. Free delivery on orders $180+.",
+    "Your destination for beauty, skincare, hair and fashion. Curated products to elevate your everyday routine. Free delivery on orders $180+.",
   keywords: [
-    "skincare",
     "beauty",
-    "cleansers",
-    "moisturizers",
-    "serums",
-    "sunscreen",
+    "skincare",
+    "hair",
+    "fashion",
+    "wigs",
+    "makeup",
     "online shopping",
     "Canada",
     "USA",
@@ -36,8 +36,8 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     locale: "en_US",
-    siteName: "GlowSkin",
-    title: "GlowSkin — Premium Skincare Products",
+    siteName: "Arade",
+    title: "Arade - Beauty, Skincare, Hair & Fashion",
     description:
       "Professional skincare products for radiant, healthy skin. Shop cleansers, moisturizers, serums, and more.",
   },

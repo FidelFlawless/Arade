@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import { Mail, Loader2, ArrowLeft } from "lucide-react";
+import { Mail, Loader2, ArrowLeft, MailCheck } from "lucide-react";
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
@@ -18,6 +18,21 @@ export default function ForgotPasswordPage() {
     setLoading(true);
 
     try {
+      // First check if account exists
+      const checkRes = await fetch("/api/auth/check-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+
+      const { exists } = await checkRes.json();
+
+      if (!exists) {
+        setError("No account found with this email address.");
+        return;
+      }
+
+      // Account exists — send reset email
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: `${window.location.origin}/auth/reset-password`,
       });
@@ -40,7 +55,7 @@ export default function ForgotPasswordPage() {
       <div className="min-h-[80vh] flex items-center justify-center py-12 px-4">
         <div className="w-full max-w-md text-center">
           <div className="card">
-            <div className="text-5xl mb-4">📧</div>
+            <MailCheck className="w-12 h-12 text-primary mx-auto mb-4" strokeWidth={1.5} />
             <h1 className="text-2xl font-bold text-foreground mb-2">
               Check Your Email
             </h1>
@@ -89,6 +104,7 @@ export default function ForgotPasswordPage() {
                 <input
                   id="email"
                   type="email"
+                  suppressHydrationWarning
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required

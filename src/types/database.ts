@@ -61,24 +61,22 @@ export interface Database {
 // ---- Profiles ----
 export interface Profile {
   id: string;
-  email: string;
+  email: string | null;
   full_name: string;
-  avatar_url: string | null;
   phone: string | null;
-  country: "CA" | "US" | null;
-  is_admin: boolean;
+  country: string | null;
+  role: string;
   created_at: string;
   updated_at: string;
 }
 
 export interface ProfileInsert {
   id: string;
-  email: string;
-  full_name: string;
-  avatar_url?: string | null;
+  email?: string | null;
+  full_name?: string;
   phone?: string | null;
-  country?: "CA" | "US" | null;
-  is_admin?: boolean;
+  country?: string | null;
+  role?: string;
   created_at?: string;
   updated_at?: string;
 }
@@ -87,9 +85,10 @@ export interface ProfileUpdate {
   email?: string;
   full_name?: string;
   avatar_url?: string | null;
+  email?: string | null;
   phone?: string | null;
-  country?: "CA" | "US" | null;
-  is_admin?: boolean;
+  country?: string | null;
+  role?: string;
   updated_at?: string;
 }
 
@@ -100,6 +99,8 @@ export interface Category {
   slug: string;
   description: string | null;
   image_url: string | null;
+  parent_category_id: string | null;
+  is_active: boolean;
   created_at: string;
   updated_at: string;
 }

@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { Check, X } from "lucide-react";
 import AddToCartButton from "@/components/product/AddToCartButton";
+import ProductImageGallery from "@/components/product/ProductImageGallery";
 
 export default async function ProductPage({
   params,
@@ -13,10 +15,21 @@ export default async function ProductPage({
 
   const { data: product } = await supabase
     .from("products")
-    .select("*, categories(name, slug)")
+    .select("*, categories(name, slug, parent_category_id)")
     .eq("slug", slug)
     .eq("is_active", true)
     .single();
+
+  // Fetch parent category if this is a subcategory
+  let parentCategory: { name: string; slug: string } | null = null;
+  if (product?.categories?.parent_category_id) {
+    const { data: parent } = await supabase
+      .from("categories")
+      .select("name, slug")
+      .eq("id", product.categories.parent_category_id)
+      .single();
+    parentCategory = parent;
+  }
 
   
   let approvedReviews: any[] = [];
@@ -54,7 +67,9 @@ export default async function ProductPage({
 
   const categoryName = product.categories?.name || "Products";
   const categorySlug = product.categories?.slug || "";
-  const imageUrl = product.images?.[0] || null;
+  const parentSlug = parentCategory?.slug || categorySlug;
+  const parentName = parentCategory?.name || categoryName;
+  const isSubcategory = !!parentCategory;
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
@@ -64,27 +79,25 @@ export default async function ProductPage({
         <span className="mx-2">/</span>
         <Link href="/shop" className="hover:text-primary">Shop</Link>
         <span className="mx-2">/</span>
-        <Link href={`/shop?category=${categorySlug}`} className="hover:text-primary">{categoryName}</Link>
+        <Link href={`/${parentSlug}`} className="hover:text-primary">{parentName}</Link>
+        {isSubcategory && (
+          <>
+            <span className="mx-2">/</span>
+            <span className="text-foreground">{categoryName}</span>
+          </>
+        )}
         <span className="mx-2">/</span>
         <span className="text-foreground">{product.name}</span>
       </nav>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-        {/* Product Image */}
-        <div className="bg-muted rounded-2xl overflow-hidden aspect-square flex items-center justify-center">
-          {imageUrl ? (
-            <img
-              src={imageUrl}
-              alt={product.name}
-              className="w-full h-full object-cover"
-            />
-          ) : (
-            <div className="text-foreground/30 text-lg">No Image Available</div>
-          )}
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 lg:gap-12">
+        {/* Product Image Gallery */}
+        <div className="lg:col-span-2">
+          <ProductImageGallery images={product.images || []} name={product.name} />
         </div>
 
         {/* Product Info */}
-        <div>
+        <div className="lg:col-span-3">
           <p className="text-primary text-sm font-medium uppercase tracking-wider">{categoryName}</p>
           <h1 className="mt-2 text-3xl lg:text-4xl font-bold text-foreground">{product.name}</h1>
 
@@ -100,9 +113,9 @@ export default async function ProductPage({
           {/* Stock */}
           <div className="mt-6">
             {product.stock_quantity > 0 ? (
-              <p className="text-green-600 font-medium">✓ In Stock ({product.stock_quantity} available)</p>
+              <p className="text-green-600 font-medium flex items-center gap-1"><Check className="w-4 h-4" /> In Stock ({product.stock_quantity} available)</p>
             ) : (
-              <p className="text-red-500 font-medium">✗ Out of Stock</p>
+              <p className="text-red-500 font-medium flex items-center gap-1"><X className="w-4 h-4" /> Out of Stock</p>
             )}
           </div>
 

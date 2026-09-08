@@ -82,6 +82,15 @@ export default function Header() {
             {loading ? (
               <div className="w-8 h-8 bg-muted rounded-full animate-pulse" />
             ) : user ? (
+              <>
+                {profile?.role === "admin" && (
+                  <Link
+                    href="/admin"
+                    className="hidden sm:flex items-center gap-1 px-3 py-1.5 bg-primary/10 text-primary text-xs font-medium rounded-lg hover:bg-primary/20 transition-colors"
+                  >
+                    Admin
+                  </Link>
+                )}
               <div className="relative">
                 <button
                   onClick={() => setUserMenuOpen(!userMenuOpen)}
@@ -134,7 +143,7 @@ export default function Header() {
                       >
                         Saved Addresses
                       </Link>
-                      {profile?.is_admin && (
+                      {profile?.role === "admin" && (
                         <Link
                           href="/admin"
                           className="block px-4 py-2 text-sm text-foreground/70 hover:bg-muted hover:text-primary"
@@ -157,6 +166,7 @@ export default function Header() {
                   </>
                 )}
               </div>
+              </>
             ) : (
               <Link
                 href="/auth/login"

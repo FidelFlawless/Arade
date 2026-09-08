@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { Eye, EyeOff, Mail, Lock, User, Loader2 } from "lucide-react";
+import { Eye, EyeOff, Mail, Lock, User, Loader2, MailCheck } from "lucide-react";
 
 export default function SignupPage() {
   const [fullName, setFullName] = useState("");
@@ -63,7 +63,7 @@ export default function SignupPage() {
       <div className="min-h-[80vh] flex items-center justify-center py-12 px-4">
         <div className="w-full max-w-md text-center">
           <div className="card">
-            <div className="text-5xl mb-4">✉️</div>
+            <MailCheck className="w-12 h-12 text-primary mx-auto mb-4" strokeWidth={1.5} />
             <h1 className="text-2xl font-bold text-foreground mb-2">
               Check Your Email
             </h1>
@@ -137,6 +137,7 @@ export default function SignupPage() {
                 <input
                   id="email"
                   type="email"
+                  suppressHydrationWarning
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required

@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/components/providers/AuthProvider";
 import { User, Package, MapPin, LogOut, Loader2 } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
 
 const accountLinks = [
   { href: "/account", label: "Profile", icon: User },
@@ -16,7 +17,9 @@ export default function AccountPage() {
   const [editing, setEditing] = useState(false);
   const [fullName, setFullName] = useState(profile?.full_name || "");
   const [phone, setPhone] = useState(profile?.phone || "");
+  const [country, setCountry] = useState(profile?.country || "CA");
   const [saving, setSaving] = useState(false);
+  const supabase = createClient();
 
   if (loading) {
     return (
@@ -43,10 +46,17 @@ export default function AccountPage() {
 
   const handleSave = async () => {
     setSaving(true);
-    // TODO: Connect to Supabase to update profile
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-    setEditing(false);
+    const { error } = await supabase
+      .from("profiles")
+      .update({ full_name: fullName.trim(), phone: phone.trim() || null, country })
+      .eq("id", user.id);
     setSaving(false);
+    if (error) {
+      alert("Failed to save: " + error.message);
+      return;
+    }
+    setEditing(false);
+    window.location.reload();
   };
 
   return (
@@ -121,6 +131,7 @@ export default function AccountPage() {
                   </label>
                   <input
                     type="email"
+                    suppressHydrationWarning
                     value={user.email || ""}
                     disabled
                     className="input bg-muted"
@@ -141,6 +152,19 @@ export default function AccountPage() {
                     placeholder="+1 (555) 123-4567"
                   />
                 </div>
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-2">
+                    Country
+                  </label>
+                  <select
+                    value={country}
+                    onChange={(e) => setCountry(e.target.value)}
+                    className="input"
+                  >
+                    <option value="CA">Canada</option>
+                    <option value="US">United States</option>
+                  </select>
+                </div>
                 <div className="flex gap-3">
                   <button
                     onClick={handleSave}
@@ -157,6 +181,7 @@ export default function AccountPage() {
                       setEditing(false);
                       setFullName(profile.full_name);
                       setPhone(profile.phone || "");
+                      setCountry(profile.country || "CA");
                     }}
                     className="btn-outline"
                   >

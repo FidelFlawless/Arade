@@ -36,13 +36,17 @@ function AdminSidebar() {
 
   return (
     <>
-      {/* Mobile menu button */}
-      <button
-        onClick={() => setMobileOpen(!mobileOpen)}
-        className="lg:hidden fixed top-4 left-4 z-50 p-2 bg-white rounded-lg shadow-md"
-      >
-        {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-      </button>
+      {/* Mobile top bar */}
+      <div className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-foreground text-white px-4 py-3 flex items-center justify-between">
+        <button
+          onClick={() => setMobileOpen(!mobileOpen)}
+          className="p-1"
+        >
+          {mobileOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+        </button>
+        <span className="font-bold text-primary-light">Arade Admin</span>
+        <div className="w-6" /> {/* spacer to balance */}
+      </div>
 
       {/* Mobile overlay */}
       {mobileOpen && (
@@ -63,7 +67,7 @@ function AdminSidebar() {
           <div className="flex items-center justify-between p-4 border-b border-white/10">
             {!collapsed && (
               <Link href="/admin" className="text-lg font-bold text-primary-light">
-                GlowSkin Admin
+                Arade Admin
               </Link>
             )}
             <button
@@ -147,7 +151,7 @@ export default function AdminLayout({
     <AuthProvider>
       <div className="min-h-screen bg-muted/30">
         <AdminSidebar />
-        <main className="lg:ml-64 p-6 lg:p-8 transition-all duration-300">
+        <main className="lg:ml-64 pt-[58px] px-4 pb-4 lg:pt-8 lg:pl-8 lg:pr-8 lg:pb-8 transition-all duration-300">
           {children}
         </main>
       </div>

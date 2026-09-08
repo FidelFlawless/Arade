@@ -4,9 +4,25 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useAuth } from "@/components/providers/AuthProvider";
 import { createClient } from "@/lib/supabase/client";
-import { MapPin, Plus, Edit2, Trash2, Star, Loader2 } from "lucide-react";
+import { MapPin, Plus, Edit2, Trash2, Loader2 } from "lucide-react";
 import { CANADIAN_PROVINCES, US_STATES } from "@/lib/constants";
 
+
+interface AddressRow {
+  id: string;
+  user_id: string;
+  first_name: string;
+  last_name: string;
+  address_line1: string;
+  address_line2: string | null;
+  city: string;
+  province_state: string;
+  postal_code: string;
+  country: string;
+  phone: string | null;
+  is_default: boolean;
+  created_at: string;
+}
 
 interface AddressForm {
   first_name: string;
@@ -41,6 +57,7 @@ export default function AddressesPage() {
   const [form, setForm] = useState<AddressForm>(emptyForm);
   const [addressesLoading, setAddressesLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const supabase = createClient();
 
   useEffect(() => {
@@ -50,8 +67,11 @@ export default function AddressesPage() {
 
   const fetchAddresses = async () => {
     if (!user) return;
-    const { data } = await supabase.from("addresses").select("*").eq("user_id", user.id).order("is_default", { ascending: false }).order("created_at", { ascending: false });
-    if (data) setAddresses(data);
+    const res = await fetch("/api/addresses");
+    if (res.ok) {
+      const data = await res.json();
+      setAddresses(data);
+    }
     setAddressesLoading(false);
   };
 
@@ -80,40 +100,43 @@ export default function AddressesPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const newErrors: Record<string, string> = {};
+    if (!form.first_name.trim()) newErrors.first_name = "First name is required";
+    if (!form.last_name.trim()) newErrors.last_name = "Last name is required";
+    if (!form.address_line1.trim()) newErrors.address_line1 = "Address is required";
+    if (!form.city.trim()) newErrors.city = "City is required";
+    if (!form.province_state) newErrors.province_state = "Province/State is required";
+    if (!form.postal_code.trim()) newErrors.postal_code = "Postal code is required";
+    if (!form.phone.trim()) newErrors.phone = "Phone number is required";
+    if (Object.keys(newErrors).length > 0) { setErrors(newErrors); return; }
+    setErrors({});
     setSaving(true);
     try {
-      if (form.is_default) {
-        await supabase.from("addresses").update({ is_default: false }).eq("user_id", user.id).eq("is_default", true);
-      }
-      const { error } = await supabase.from("addresses").insert({
-        user_id: user.id, first_name: form.first_name, last_name: form.last_name,
-        address_line1: form.address_line1, address_line2: form.address_line2 || null,
-        city: form.city, province_state: form.province_state, postal_code: form.postal_code,
-        country: form.country, phone: form.phone || null, is_default: form.is_default,
+      const res = await fetch("/api/addresses", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          first_name: form.first_name, last_name: form.last_name,
+          address_line1: form.address_line1, address_line2: form.address_line2 || null,
+          city: form.city, province_state: form.province_state, postal_code: form.postal_code,
+          country: form.country, phone: form.phone || null, is_default: true,
+        }),
       });
-      if (error) throw error;
-
-    if (form.is_default) {
-      setAddresses((prev) =>
-        prev.map((a) => ({ ...a, is_default: false }))
-      );
-    }
-
-    await fetchAddresses();
-    setForm(emptyForm);
+      if (!res.ok) {
+        const err = await res.json();
+        console.error("Address save error:", err);
+        alert("Failed to save address: " + (err.error || "Unknown error"));
+        return;
+      }
+      await fetchAddresses();
+      setForm(emptyForm);
       setShowForm(false);
-    } catch (err) { console.error(err); } finally { setSaving(false); }
+    } catch (err) { console.error(err); alert("Failed to save address. Please try again."); } finally { setSaving(false); }
   };
 
   const deleteAddress = async (id: string) => {
-    await supabase.from("addresses").delete().eq("id", id);
+    await fetch(`/api/addresses?id=${id}`, { method: "DELETE" });
     setAddresses((prev) => prev.filter((a) => a.id !== id));
-  };
-
-  const setDefault = async (id: string) => {
-    await supabase.from("addresses").update({ is_default: false }).eq("user_id", user.id).eq("is_default", true);
-    await supabase.from("addresses").update({ is_default: true }).eq("id", id);
-    setAddresses((prev) => prev.map((a) => ({ ...a, is_default: a.id === id })));
   };
 
   const provinces =
@@ -125,20 +148,22 @@ export default function AddressesPage() {
         <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-foreground">
           Saved Addresses
         </h1>
-        <button
-          onClick={() => setShowForm(!showForm)}
-          className="btn-primary flex items-center justify-center gap-2 w-full sm:w-auto"
-        >
-          <Plus className="w-4 h-4" />
-          Add Address
-        </button>
+        {addresses.length === 0 && !showForm && (
+          <button
+            onClick={() => setShowForm(true)}
+            className="btn-primary flex items-center justify-center gap-2 w-full sm:w-auto"
+          >
+            <Plus className="w-4 h-4" />
+            Add Address
+          </button>
+        )}
       </div>
 
       {/* Add address form */}
       {showForm && (
         <div className="card mb-8">
           <h2 className="text-lg font-semibold text-foreground mb-4">
-            New Address
+            {addresses.length > 0 ? "Edit Address" : "Add Address"}
           </h2>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -152,9 +177,9 @@ export default function AddressesPage() {
                   onChange={(e) =>
                     setForm({ ...form, first_name: e.target.value })
                   }
-                  required
-                  className="input"
+                  className={`input ${errors.first_name ? "border-red-500" : ""}`}
                 />
+                {errors.first_name && <p className="text-xs text-red-600 mt-1">{errors.first_name}</p>}
               </div>
               <div>
                 <label className="block text-sm font-medium text-foreground mb-2">
@@ -166,9 +191,9 @@ export default function AddressesPage() {
                   onChange={(e) =>
                     setForm({ ...form, last_name: e.target.value })
                   }
-                  required
-                  className="input"
+                  className={`input ${errors.last_name ? "border-red-500" : ""}`}
                 />
+                {errors.last_name && <p className="text-xs text-red-600 mt-1">{errors.last_name}</p>}
               </div>
             </div>
 
@@ -202,10 +227,10 @@ export default function AddressesPage() {
                 onChange={(e) =>
                   setForm({ ...form, address_line1: e.target.value })
                 }
-                required
-                className="input"
+                className={`input ${errors.address_line1 ? "border-red-500" : ""}`}
                 placeholder="Street address"
               />
+              {errors.address_line1 && <p className="text-xs text-red-600 mt-1">{errors.address_line1}</p>}
             </div>
 
             <div>
@@ -234,9 +259,9 @@ export default function AddressesPage() {
                   onChange={(e) =>
                     setForm({ ...form, city: e.target.value })
                   }
-                  required
-                  className="input"
+                  className={`input ${errors.city ? "border-red-500" : ""}`}
                 />
+                {errors.city && <p className="text-xs text-red-600 mt-1">{errors.city}</p>}
               </div>
               <div>
                 <label className="block text-sm font-medium text-foreground mb-2">
@@ -247,8 +272,7 @@ export default function AddressesPage() {
                   onChange={(e) =>
                     setForm({ ...form, province_state: e.target.value })
                   }
-                  required
-                  className="input"
+                  className={`input ${errors.province_state ? "border-red-500" : ""}`}
                 >
                   <option value="">Select...</option>
                   {provinces.map((p) => (
@@ -257,6 +281,7 @@ export default function AddressesPage() {
                     </option>
                   ))}
                 </select>
+                {errors.province_state && <p className="text-xs text-red-600 mt-1">{errors.province_state}</p>}
               </div>
               <div>
                 <label className="block text-sm font-medium text-foreground mb-2">
@@ -268,18 +293,18 @@ export default function AddressesPage() {
                   onChange={(e) =>
                     setForm({ ...form, postal_code: e.target.value })
                   }
-                  required
-                  className="input"
+                  className={`input ${errors.postal_code ? "border-red-500" : ""}`}
                   placeholder={
                     form.country === "CA" ? "A1A 1A1" : "12345"
                   }
                 />
+                {errors.postal_code && <p className="text-xs text-red-600 mt-1">{errors.postal_code}</p>}
               </div>
             </div>
 
             <div>
               <label className="block text-sm font-medium text-foreground mb-2">
-                Phone (Optional)
+                Phone 
               </label>
               <input
                 type="tel"
@@ -287,24 +312,13 @@ export default function AddressesPage() {
                 onChange={(e) =>
                   setForm({ ...form, phone: e.target.value })
                 }
-                className="input"
+                className={`input ${errors.phone ? "border-red-500" : ""}`}
                 placeholder="+1 (555) 123-4567"
               />
+              {errors.phone && <p className="text-xs text-red-600 mt-1">{errors.phone}</p>}
             </div>
 
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={form.is_default}
-                onChange={(e) =>
-                  setForm({ ...form, is_default: e.target.checked })
-                }
-                className="w-4 h-4 rounded border-border text-primary focus:ring-primary/20"
-              />
-              <span className="text-sm text-foreground/70">
-                Set as default address
-              </span>
-            </label>
+
 
             <div className="flex gap-3">
               <button
@@ -350,19 +364,12 @@ export default function AddressesPage() {
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {addresses.map((address) => (
+        <div>
+          {addresses.slice(0, 1).map((address) => (
             <div
               key={address.id}
-              className={`card relative ${
-                address.is_default ? "border-primary" : ""
-              }`}
+              className="card"
             >
-              {address.is_default && (
-                <span className="absolute top-3 right-3 bg-primary text-white text-xs px-2 py-1 rounded-full flex items-center gap-1">
-                  <Star className="w-3 h-3" /> Default
-                </span>
-              )}
               <p className="font-medium text-foreground">
                 {address.first_name} {address.last_name}
               </p>
@@ -385,15 +392,17 @@ export default function AddressesPage() {
                 </p>
               )}
               <div className="flex items-center gap-2 mt-4 pt-4 border-t border-border">
-                {!address.is_default && (
-                  <button
-                    onClick={() => setDefault(address.id)}
-                    className="text-xs text-primary hover:text-primary-dark"
-                  >
-                    Set as Default
-                  </button>
-                )}
-                <button className="text-xs text-foreground/50 hover:text-primary flex items-center gap-1">
+                <button
+                  onClick={() => {
+                    setForm({
+                      first_name: address.first_name, last_name: address.last_name,
+                      address_line1: address.address_line1, address_line2: address.address_line2 || "",
+                      city: address.city, province_state: address.province_state, postal_code: address.postal_code,
+                      country: address.country as "CA" | "US", phone: address.phone || "", is_default: true,
+                    });
+                    setShowForm(true);
+                  }}
+                  className="text-xs text-foreground/50 hover:text-primary flex items-center gap-1 cursor-pointer">
                   <Edit2 className="w-3 h-3" /> Edit
                 </button>
                 <button

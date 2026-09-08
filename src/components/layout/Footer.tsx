@@ -5,12 +5,12 @@ import Link from "next/link";
 import { SITE_NAME } from "@/lib/constants";
 
 const footerLinks = {
-  shop: [
+  categories: [
+    { label: "Beauty", href: "/beauty" },
+    { label: "Skincare", href: "/skincare" },
+    { label: "Hair", href: "/hair" },
+    { label: "Fashion", href: "/fashion" },
     { label: "All Products", href: "/shop" },
-    { label: "Cleansers", href: "/shop?category=cleansers" },
-    { label: "Moisturizers", href: "/shop?category=moisturizers" },
-    { label: "Serums", href: "/shop?category=serums" },
-    { label: "Sunscreen", href: "/shop?category=sunscreen" },
   ],
   company: [
     { label: "About Us", href: "/about" },
@@ -22,7 +22,6 @@ const footerLinks = {
   support: [
     { label: "FAQ", href: "/faq" },
     { label: "Track Order", href: "/account/orders" },
-    { label: "Size Guide", href: "/size-guide" },
   ],
 };
 
@@ -41,8 +40,8 @@ export default function Footer() {
               </span>
             </Link>
             <p className="mt-4 text-white/60 text-sm leading-relaxed">
-              Professional skincare products for radiant, healthy skin.
-              Discover our carefully curated collection.
+              Your destination for beauty, skincare, hair and fashion.
+              Curated products to elevate your everyday routine.
             </p>
 
             </div>
@@ -54,7 +53,7 @@ export default function Footer() {
                 Shop
               </h3>
               <ul className="space-y-3">
-                {footerLinks.shop.map((link) => (
+                {footerLinks.categories.map((link) => (
                   <li key={link.href}>
                     <Link
                       href={link.href}

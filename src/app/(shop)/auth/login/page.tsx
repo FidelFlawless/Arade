@@ -32,7 +32,11 @@ export default function LoginPage() {
       }
 
       const params = new URLSearchParams(window.location.search);
-      const redirect = params.get("redirect") || "/account";
+      let redirect = params.get("redirect") || "/account";
+      // Security: only allow internal redirects
+      if (!redirect.startsWith("/") || redirect.startsWith("//")) {
+        redirect = "/account";
+      }
       router.push(redirect);
       router.refresh();
     } catch {
@@ -72,6 +76,7 @@ export default function LoginPage() {
                 <input
                   id="email"
                   type="email"
+                  suppressHydrationWarning
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required

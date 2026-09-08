@@ -2,13 +2,11 @@
 
 import { useState, FormEvent } from "react";
 import { Loader2, Check } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
 
 export default function NewsletterForm() {
   const [email, setEmail] = useState("");
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "duplicate" | "error">("idle");
   const [message, setMessage] = useState("");
-  const supabase = createClient();
 
   const validateEmail = (value: string): boolean => {
     const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -34,32 +32,31 @@ export default function NewsletterForm() {
     setStatus("loading");
     setMessage("");
 
-    const { data: existing } = await supabase
-      .from("newsletter_subscribers")
-      .select("id")
-      .eq("email", trimmed)
-      .maybeSingle();
+    try {
+      const res = await fetch("/api/newsletter", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: trimmed }),
+      });
 
-    if (existing) {
-      setStatus("duplicate");
-      setMessage("You're already subscribed! ✨");
-      setEmail("");
-      return;
-    }
+      const data = await res.json();
 
-    const { error } = await supabase
-      .from("newsletter_subscribers")
-      .insert({ email: trimmed });
-
-    if (error) {
+      if (data.status === "duplicate") {
+        setStatus("duplicate");
+        setMessage(data.message || "You're already subscribed!");
+        setEmail("");
+      } else if (data.status === "success") {
+        setStatus("success");
+        setMessage(data.message || "You're subscribed! Welcome to Arade.");
+        setEmail("");
+      } else {
+        setStatus("error");
+        setMessage(data.error || "Something went wrong. Please try again later.");
+      }
+    } catch {
       setStatus("error");
-      setMessage("Something went wrong. Please try again later.");
-      return;
+      setMessage("Network error. Please check your connection.");
     }
-
-    setStatus("success");
-    setMessage("You're subscribed! ✨");
-    setEmail("");
   };
 
   return (
@@ -73,6 +70,7 @@ export default function NewsletterForm() {
           disabled={status === "loading"}
           className="flex-1 px-4 py-3 rounded-lg bg-white/20 border border-white/30 text-white placeholder-white/60 outline-none focus:ring-2 focus:ring-white/40 disabled:opacity-50"
           aria-label="Email address"
+          suppressHydrationWarning
         />
         <button
           type="submit"

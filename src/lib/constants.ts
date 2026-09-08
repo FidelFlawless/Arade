@@ -1,7 +1,7 @@
 // Site information
 export const SITE_NAME = "Arade";
 export const SITE_DESCRIPTION =
-  "Professional skincare products for radiant, healthy skin. Shop cleansers, moisturizers, serums, and more.";
+  "Your destination for beauty, skincare, hair and fashion. Curated products to elevate your everyday routine.";
 export const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 
 // Delivery settings
@@ -89,16 +89,58 @@ export const US_STATES = [
   { code: "WY", name: "Wyoming" },
 ];
 
-// Product categories
+// Main categories (top-level)
+export const MAIN_CATEGORIES = [
+  { slug: "beauty", name: "Beauty", description: "Discover beauty essentials curated for your everyday routine." },
+  { slug: "skincare", name: "Skincare", description: "Carefully selected products for your skincare routine." },
+  { slug: "hair", name: "Hair", description: "Explore wigs and hair essentials." },
+  { slug: "fashion", name: "Fashion", description: "Find pieces that express your personal style." },
+] as const;
+
+export type MainCategorySlug = (typeof MAIN_CATEGORIES)[number]["slug"];
+
+// Subcategories (linked to main categories)
+export const SUBCATEGORIES: Record<MainCategorySlug, { slug: string; name: string }[]> = {
+  beauty: [
+    { slug: "makeup", name: "Makeup" },
+    { slug: "fragrances", name: "Fragrances" },
+    { slug: "beauty-tools", name: "Beauty Tools" },
+  ],
+  skincare: [
+    { slug: "cleansers", name: "Cleansers" },
+    { slug: "moisturizers", name: "Moisturizers" },
+    { slug: "soaps", name: "Soaps" },
+    { slug: "skincare-sets", name: "Skincare Sets" },
+    { slug: "body-care", name: "Body Care" },
+  ],
+  hair: [
+    { slug: "wigs", name: "Wigs" },
+    { slug: "hair-care", name: "Hair Care" },
+    { slug: "hair-accessories", name: "Hair Accessories" },
+  ],
+  fashion: [
+    { slug: "dresses", name: "Dresses" },
+    { slug: "tops", name: "Tops" },
+    { slug: "accessories", name: "Accessories" },
+  ],
+};
+
+// Legacy product categories for backward compatibility
 export const PRODUCT_CATEGORIES = [
   { slug: "cleansers", name: "Cleansers" },
   { slug: "moisturizers", name: "Moisturizers" },
-  { slug: "serums", name: "Serums" },
-  { slug: "sunscreen", name: "Sunscreen" },
-  { slug: "toners", name: "Toners" },
-  { slug: "masks", name: "Masks" },
-  { slug: "body-care", name: "Body Care" },
+  { slug: "soaps", name: "Soaps" },
   { slug: "skincare-sets", name: "Skincare Sets" },
+  { slug: "body-care", name: "Body Care" },
+  { slug: "makeup", name: "Makeup" },
+  { slug: "fragrances", name: "Fragrances" },
+  { slug: "beauty-tools", name: "Beauty Tools" },
+  { slug: "wigs", name: "Wigs" },
+  { slug: "hair-care", name: "Hair Care" },
+  { slug: "hair-accessories", name: "Hair Accessories" },
+  { slug: "dresses", name: "Dresses" },
+  { slug: "tops", name: "Tops" },
+  { slug: "accessories", name: "Accessories" },
 ];
 
 // Order statuses
@@ -164,8 +206,11 @@ export const PRODUCTS_PER_PAGE = 12;
 // Navigation links
 export const NAV_LINKS = [
   { href: "/", label: "Home" },
-  { href: "/shop", label: "Shop" },
-  { href: "/collection", label: "Collection" },
+  { href: "/beauty", label: "Beauty" },
+  { href: "/skincare", label: "Skincare" },
+  { href: "/hair", label: "Hair" },
+  { href: "/fashion", label: "Fashion" },
+  { href: "/collection", label: "Collections" },
   { href: "/about", label: "About" },
   { href: "/contact", label: "Contact" },
 ];

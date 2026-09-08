@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Trash2, Plus, Minus, ShoppingBag, ArrowLeft, Loader2 } from "lucide-react";
+import { Trash2, Plus, Minus, ShoppingBag, ArrowLeft, Loader2, Package, Lock, Truck } from "lucide-react";
 import { useCart } from "@/components/providers/CartProvider";
 import { useAuth } from "@/components/providers/AuthProvider";
 import { formatPrice, calculateDeliveryFee } from "@/lib/utils";
@@ -66,8 +66,8 @@ export default function CartPage() {
             onChange={(e) => setCountry(e.target.value as "CA" | "US")}
             className="text-sm border border-border rounded-lg px-3 py-1.5"
           >
-            <option value="CA">🇨🇦 Canada (CAD)</option>
-            <option value="US">🇺🇸 United States (USD)</option>
+            <option value="CA">Canada (CAD)</option>
+            <option value="US">United States (USD)</option>
           </select>
         </div>
       </div>
@@ -89,7 +89,7 @@ export default function CartPage() {
                     className="w-full h-full object-cover"
                   />
                 ) : (
-                  <span className="text-4xl">🧴</span>
+                  <Package className="w-10 h-10 text-foreground/20" />
                 )}
               </Link>
 
@@ -221,8 +221,8 @@ export default function CartPage() {
             {/* Trust badges */}
             <div className="mt-6 pt-4 border-t border-border">
               <div className="flex items-center justify-center gap-4 text-xs text-foreground/50">
-                <span>🔒 Secure Checkout</span>
-                <span>🚚 Free Shipping $180+</span>
+                <span className="flex items-center gap-1"><Lock className="w-3 h-3" /> Secure Checkout</span>
+                <span className="flex items-center gap-1"><Truck className="w-3 h-3" /> Free Shipping $180+</span>
               </div>
             </div>
           </div>
