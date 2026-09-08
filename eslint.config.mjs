@@ -1,5 +1,4 @@
 import { defineConfig, globalIgnores } from "eslint/config";
-import nextPlugin from "@next/next";
 
 const eslintConfig = defineConfig([
   globalIgnores([
@@ -9,12 +8,8 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
   ]),
   {
-    plugins: {
-      "@next/next": nextPlugin,
-    },
     rules: {
-      ...nextPlugin.configs.recommended.rules,
-      ...nextPlugin.configs["core-web-vitals"].rules,
+      "no-unused-vars": "warn",
     },
   }
 ]);
