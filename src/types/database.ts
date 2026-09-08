@@ -63,6 +63,9 @@ export interface Profile {
   id: string;
   email: string | null;
   full_name: string;
+  first_name: string;
+  last_name: string;
+  avatar_url: string | null;
   phone: string | null;
   country: string | null;
   role: string;
@@ -74,6 +77,9 @@ export interface ProfileInsert {
   id: string;
   email?: string | null;
   full_name?: string;
+  first_name?: string;
+  last_name?: string;
+  avatar_url?: string | null;
   phone?: string | null;
   country?: string | null;
   role?: string;
@@ -82,10 +88,11 @@ export interface ProfileInsert {
 }
 
 export interface ProfileUpdate {
-  email?: string;
-  full_name?: string;
-  avatar_url?: string | null;
   email?: string | null;
+  full_name?: string;
+  first_name?: string;
+  last_name?: string;
+  avatar_url?: string | null;
   phone?: string | null;
   country?: string | null;
   role?: string;

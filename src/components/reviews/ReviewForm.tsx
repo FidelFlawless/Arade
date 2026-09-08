@@ -27,11 +27,11 @@ export default function ReviewForm({ userId, productId, productName, orderId, on
     }
     setLoading(true);
     setResult(null);
-    const res = await submitReview(userId, productId, orderId, rating, comment);
+    const res = await submitReview(userId, productId, orderId, rating, comment || "");
     if ("error" in res) {
-      setResult({ type: "error", message: res.error });
+      setResult({ type: "error", message: (res as { error: string }).error });
     } else {
-      setResult({ type: "success", message: res.success });
+      setResult({ type: "success", message: (res as { success: string }).success });
       setRating(0);
       setComment("");
       onSubmitted?.();

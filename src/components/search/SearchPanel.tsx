@@ -12,7 +12,7 @@ interface SearchResult {
   price_cad: number;
   price_usd: number;
   images: string[] | null;
-  categories: { name: string } | null;
+  categories: { name: string }[] | null;
 }
 
 interface SearchPanelProps {
@@ -128,7 +128,7 @@ export default function SearchPanel({ isOpen, onClose }: SearchPanelProps) {
                     </div>
                     <div className="flex-1 min-w-0">
                       <h4 className="font-medium text-foreground text-sm truncate group-hover:text-primary transition-colors">{product.name}</h4>
-                      {product.categories?.name && <p className="text-xs text-foreground/40 mt-0.5">{product.categories.name}</p>}
+                      {product.categories?.[0]?.name && <p className="text-xs text-foreground/40 mt-0.5">{product.categories[0].name}</p>}
                     </div>
                     <span className="font-semibold text-primary text-sm flex-shrink-0">C${product.price_cad}</span>
                   </Link>

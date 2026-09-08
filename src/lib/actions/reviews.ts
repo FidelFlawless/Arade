@@ -12,7 +12,7 @@ export async function submitReview(
   productId: string,
   orderId: string,
   rating: number,
-  comment: string
+  comment?: string
 ) {
   if (!userId || !productId || !orderId) {
     return { error: "Missing required fields." };
@@ -66,7 +66,7 @@ export async function submitReview(
     product_id: productId,
     order_id: orderId,
     rating,
-    comment: comment.trim() || null,
+    comment: comment?.trim() || null,
     is_verified: true,
     is_approved: false,
   });
