@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import ProductCard from "@/components/product/ProductCard";
@@ -15,7 +15,7 @@ interface Collection {
   productCount: number;
 }
 
-export default function CollectionPage() {
+function CollectionContent() {
   const [collections, setCollections] = useState<Collection[]>([]);
   const searchParams = useSearchParams();
   const [loading, setLoading] = useState(true);
@@ -150,4 +150,12 @@ export default function CollectionPage() {
 function getDesc(name: string): string {
   const d: Record<string, string> = { Cleansers: "Gentle formulas to purify and refresh.", Moisturizers: "Hydrating creams for all-day soft skin.", Soaps: "Luxurious cleansing bars for daily use.", "Skincare Sets": "Curated bundles for a complete routine.", "Body care": "Nourishing products for head-to-toe radiance." };
   return d[name] || "Explore our curated " + name.toLowerCase() + " collection.";
+}
+
+export default function CollectionPage() {
+  return (
+    <Suspense fallback={<div className="min-h-[60vh] flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>}>
+      <CollectionContent />
+    </Suspense>
+  );
 }
