@@ -4,7 +4,7 @@ import { createClient } from "@supabase/supabase-js";
 
 function getStripe() {
   const rawKey = process.env.STRIPE_SECRET_KEY || "";
-  const cleanKey = rawKey.trim().replace(/^["']|["']$/g, "").replace(/[\r\n\t]/g, "");
+  const cleanKey = rawKey.trim().replace(/^["']|["']$/g, "").replace(/[^\x20-\x7E]/g, "").replace(/\s+/g, "");
   if (!cleanKey) {
     throw new Error("STRIPE_SECRET_KEY is not configured in environment variables");
   }
