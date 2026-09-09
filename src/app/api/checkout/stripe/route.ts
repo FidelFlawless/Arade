@@ -151,8 +151,7 @@ export async function POST(req: NextRequest) {
         currency,
         payment_status: "pending",
         order_status: "pending",
-        shipping_address: shippingAddress,
-        country,
+        shipping_address: { ...shippingAddress, country },
       })
       .select("id, order_number")
       .single();
