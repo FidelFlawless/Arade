@@ -155,12 +155,10 @@ export async function POST(req: NextRequest) {
         shipping_last_name: shippingAddress.last_name,
         shipping_email: shippingAddress.email,
         shipping_phone: shippingAddress.phone,
-        shipping_address: shippingAddress.address_line1,
-        shipping_address2: shippingAddress.address_line2,
+        shipping_address: shippingAddress.address_line1 + (shippingAddress.address_line2 ? ', ' + shippingAddress.address_line2 : ''),
         shipping_city: shippingAddress.city,
         shipping_province: shippingAddress.province_state,
         shipping_postal_code: shippingAddress.postal_code,
-        shipping_country: country,
       })
       .select("id, order_number")
       .single();
