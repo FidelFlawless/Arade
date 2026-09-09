@@ -14,32 +14,19 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { userId, items, shippingAddress, country, currency } = body;
 
-    // 1. Verify user is authenticated via cookies or auth header
-    const authHeader = req.headers.get("authorization");
+    // 1. Verify user exists in database (service-role key bypasses RLS)
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
 
-    let authenticatedUserId = userId;
+    const { data: profile } = await supabaseAdmin
+      .from("profiles")
+      .select("id")
+      .eq("id", userId)
+      .single();
 
-    if (authHeader) {
-      // Try verifying via access token
-      const supabase = createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-        { global: { headers: { authorization: authHeader } } }
-      );
-      const { data: { user }, error: authError } = await supabase.auth.getUser();
-      if (authError || !user || user.id !== userId) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-      }
-    } else {
-      // Fallback: verify user exists in database
-      const { data: profile } = await supabaseAdmin
-        .from("profiles")
-        .select("id")
-        .eq("id", userId)
-        .single();
-      if (!profile) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-      }
+    if (!profile) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     // 2. Validate inputs
