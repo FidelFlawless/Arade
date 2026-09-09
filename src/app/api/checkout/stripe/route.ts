@@ -158,7 +158,7 @@ export async function POST(req: NextRequest) {
       .single();
 
     if (orderError) {
-      return NextResponse.json({ error: "Failed to create order" }, { status: 500 });
+      return NextResponse.json({ error: "Failed to create order", details: orderError.message }, { status: 500 });
     }
 
     // 8. Create order items
@@ -177,7 +177,7 @@ export async function POST(req: NextRequest) {
       .insert(orderItems);
 
     if (itemsError) {
-      return NextResponse.json({ error: "Failed to create order items" }, { status: 500 });
+      return NextResponse.json({ error: "Failed to create order items", details: itemsError.message }, { status: 500 });
     }
 
     // 9. Create Stripe Checkout Session

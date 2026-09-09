@@ -162,7 +162,7 @@ export default function CheckoutPage() {
         // Redirect to Stripe Checkout
         window.location.href = data.url;
       } else {
-        alert(data.error || "Failed to start checkout. Please try again.");
+        alert(data.details ? `${data.error}: ${data.details}` : data.error || "Failed to start checkout. Please try again.");
         setLoading(false);
       }
     } catch {
