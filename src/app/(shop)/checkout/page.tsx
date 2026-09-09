@@ -139,7 +139,7 @@ export default function CheckoutPage() {
 
       // Get the user's session token for auth header
       const { data: sessionData } = await supabase.auth.getSession();
-      const token = sessionData?.session?.access_token;
+      const token = sessionData?.session?.access_token || undefined;
 
       const res = await fetch("/api/checkout/stripe", {
         method: "POST",
