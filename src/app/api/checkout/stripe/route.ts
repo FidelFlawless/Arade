@@ -2,7 +2,17 @@ import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 import { createClient } from "@supabase/supabase-js";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
+function getStripe() {
+  const rawKey = process.env.STRIPE_SECRET_KEY || "";
+  const cleanKey = rawKey.trim().replace(/^["']|["']$/g, "").replace(/[\r\n\t]/g, "");
+  if (!cleanKey) {
+    throw new Error("STRIPE_SECRET_KEY is not configured in environment variables");
+  }
+  return new Stripe(cleanKey, {
+    maxNetworkRetries: 2,
+    timeout: 30000,
+  });
+}
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -11,6 +21,7 @@ const supabaseAdmin = createClient(
 
 export async function POST(req: NextRequest) {
   try {
+    const stripe = getStripe();
     const body = await req.json();
     const { userId, items, shippingAddress, country, currency } = body;
 
@@ -114,7 +125,9 @@ export async function POST(req: NextRequest) {
           currency: currency.toLowerCase(),
           product_data: {
             name: item.name,
-            ...(item.image ? { images: [item.image] } : {}),
+            ...(item.image && typeof item.image === "string" && item.image.startsWith("http")
+              ? { images: [item.image] }
+              : {}),
           },
           unit_amount: Math.round(item.serverPrice * 100), // Stripe uses cents
         },
