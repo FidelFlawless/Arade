@@ -116,15 +116,57 @@ export default function CheckoutPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validateForm()) return;
+    if (!user) return;
 
     setLoading(true);
     try {
-      // TODO: Connect to Stripe checkout
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-      alert("Payment will be available soon. Stripe integration coming next!");
+      const shippingAddress = {
+        first_name: form.first_name,
+        last_name: form.last_name,
+        email: form.email,
+        phone: form.phone,
+        address_line1: form.address_line1,
+        address_line2: form.address_line2,
+        city: form.city,
+        province_state: form.province_state,
+        postal_code: form.postal_code,
+      };
+
+      const items = cartItems.map((item) => ({
+        productId: item.id,
+        quantity: item.quantity,
+      }));
+
+      // Get the user's session token for auth header
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token;
+
+      const res = await fetch("/api/checkout/stripe", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          userId: user.id,
+          items,
+          shippingAddress,
+          country: form.country,
+          currency,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (data.success && data.url) {
+        // Redirect to Stripe Checkout
+        window.location.href = data.url;
+      } else {
+        alert(data.error || "Failed to start checkout. Please try again.");
+        setLoading(false);
+      }
     } catch {
       alert("An error occurred. Please try again.");
-    } finally {
       setLoading(false);
     }
   };
