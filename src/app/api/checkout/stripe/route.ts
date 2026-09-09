@@ -151,7 +151,17 @@ export async function POST(req: NextRequest) {
         currency,
         payment_status: "pending",
         order_status: "pending",
-        shipping_address: JSON.stringify({
+        shipping_first_name: shippingAddress.first_name,
+        shipping_last_name: shippingAddress.last_name,
+        shipping_phone: shippingAddress.phone || null,
+        shipping_country: country,
+        shipping_address_line1: shippingAddress.address_line1,
+        shipping_address_line2: shippingAddress.address_line2 || null,
+        shipping_city: shippingAddress.city,
+        shipping_state_province: shippingAddress.province_state,
+        shipping_postal_code: shippingAddress.postal_code,
+        country: country,
+        shipping_address: {
           first_name: shippingAddress.first_name,
           last_name: shippingAddress.last_name,
           email: shippingAddress.email,
@@ -162,7 +172,7 @@ export async function POST(req: NextRequest) {
           province_state: shippingAddress.province_state,
           postal_code: shippingAddress.postal_code,
           country: country,
-        }),
+        },
       })
       .select("id, order_number")
       .single();
@@ -178,8 +188,7 @@ export async function POST(req: NextRequest) {
       product_name: item.name,
       quantity: item.quantity,
       unit_price: item.serverPrice,
-      total_price: item.serverPrice * item.quantity,
-      currency,
+      subtotal: item.serverPrice * item.quantity,
     }));
 
     const { error: itemsError } = await supabaseAdmin

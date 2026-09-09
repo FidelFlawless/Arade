@@ -10,7 +10,8 @@ interface OrderRow {
   id: string;
   order_number: string;
   created_at: string;
-  status: string;
+  status?: string;
+  order_status?: string;
   payment_status: string;
   currency: string;
   total: number;
@@ -131,11 +132,11 @@ export default function OrdersPage() {
                   </p>
                   <span
                     className={`inline-block mt-1 px-2 py-0.5 rounded-full text-xs font-medium ${
-                      statusColors[order.status] || "bg-gray-100 text-gray-800"
+                      statusColors[order.order_status || order.status || "pending"] || "bg-gray-100 text-gray-800"
                     }`}
                   >
-                    {order.status.charAt(0).toUpperCase() +
-                      order.status.slice(1)}
+                    {(order.order_status || order.status || "pending").charAt(0).toUpperCase() +
+                      (order.order_status || order.status || "pending").slice(1)}
                   </span>
                 </div>
                 <ChevronRight className="w-5 h-5 text-foreground/30" />

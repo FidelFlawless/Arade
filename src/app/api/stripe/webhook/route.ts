@@ -59,8 +59,9 @@ export async function POST(req: NextRequest) {
     // Create payment record
     await supabaseAdmin.from("payments").insert({
       order_id: orderId,
-      stripe_session_id: session.id,
-      stripe_payment_intent: session.payment_intent,
+      provider: "stripe",
+      stripe_checkout_session_id: session.id,
+      stripe_payment_intent_id: session.payment_intent as string,
       amount: (session.amount_total || 0) / 100,
       currency: session.currency?.toUpperCase() || "CAD",
       status: "succeeded",

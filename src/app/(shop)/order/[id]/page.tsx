@@ -21,7 +21,8 @@ interface OrderItem {
 interface Order {
   id: string;
   order_number: string;
-  status: string;
+  status?: string;
+  order_status?: string;
   payment_status: string;
   currency: string;
   subtotal: number;
@@ -33,7 +34,8 @@ interface Order {
   shipping_address_line1: string;
   shipping_address_line2: string | null;
   shipping_city: string;
-  shipping_province_state: string;
+  shipping_province_state?: string;
+  shipping_state_province?: string;
   shipping_postal_code: string;
   shipping_country: string;
   order_items: OrderItem[];
@@ -106,7 +108,7 @@ export default function OrderDetailPage() {
         <div className="card">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center"><Package className="w-5 h-5 text-blue-600" /></div>
-            <div><p className="font-medium">Status</p><p className="text-sm text-blue-600 capitalize">{order.status}</p></div>
+            <div><p className="font-medium">Status</p><p className="text-sm text-blue-600 capitalize">{order.order_status || order.status}</p></div>
           </div>
         </div>
       </div>
@@ -115,7 +117,7 @@ export default function OrderDetailPage() {
         <div className="flex items-center gap-3 mb-4"><Truck className="w-5 h-5 text-primary" /><h2 className="font-semibold">Shipping Address</h2></div>
         <p className="text-foreground/70">{order.shipping_first_name} {order.shipping_last_name}</p>
         <p className="text-foreground/70">{order.shipping_address_line1}{order.shipping_address_line2 && <>, {order.shipping_address_line2}</>}</p>
-        <p className="text-foreground/70">{order.shipping_city}, {order.shipping_province_state} {order.shipping_postal_code}</p>
+        <p className="text-foreground/70">{order.shipping_city}, {order.shipping_state_province || order.shipping_province_state} {order.shipping_postal_code}</p>
         <p className="text-foreground/70">{order.shipping_country === "CA" ? "Canada" : "United States"}</p>
       </div>
 

@@ -116,8 +116,17 @@ export async function POST(req: NextRequest) {
         currency,
         payment_status: "pending",
         order_status: "pending",
+        shipping_first_name: shippingAddress.first_name,
+        shipping_last_name: shippingAddress.last_name,
+        shipping_phone: shippingAddress.phone || null,
+        shipping_country: country,
+        shipping_address_line1: shippingAddress.address_line1,
+        shipping_address_line2: shippingAddress.address_line2 || null,
+        shipping_city: shippingAddress.city,
+        shipping_state_province: shippingAddress.province_state,
+        shipping_postal_code: shippingAddress.postal_code,
+        country: country,
         shipping_address: shippingAddress,
-        country,
       })
       .select("id, order_number")
       .single();
@@ -133,8 +142,7 @@ export async function POST(req: NextRequest) {
       product_name: item.product_name,
       quantity: item.quantity,
       unit_price: item.unit_price,
-      total_price: item.total_price,
-      currency,
+      subtotal: item.unit_price * item.quantity,
     }));
 
     const { error: itemsError } = await supabaseAdmin
