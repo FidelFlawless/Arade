@@ -151,13 +151,18 @@ export async function POST(req: NextRequest) {
         currency,
         payment_status: "pending",
         order_status: "pending",
-        shipping_first_name: shippingAddress.first_name,
-        shipping_last_name: shippingAddress.last_name,
-        shipping_phone: shippingAddress.phone,
-        shipping_address: shippingAddress.address_line1 + (shippingAddress.address_line2 ? ', ' + shippingAddress.address_line2 : ''),
-        shipping_city: shippingAddress.city,
-        shipping_province: shippingAddress.province_state,
-        shipping_postal_code: shippingAddress.postal_code,
+        shipping_address: JSON.stringify({
+          first_name: shippingAddress.first_name,
+          last_name: shippingAddress.last_name,
+          email: shippingAddress.email,
+          phone: shippingAddress.phone,
+          address_line1: shippingAddress.address_line1,
+          address_line2: shippingAddress.address_line2,
+          city: shippingAddress.city,
+          province_state: shippingAddress.province_state,
+          postal_code: shippingAddress.postal_code,
+          country: country,
+        }),
       })
       .select("id, order_number")
       .single();
