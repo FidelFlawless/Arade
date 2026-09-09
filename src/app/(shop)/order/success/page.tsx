@@ -1,13 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { CheckCircle, Package, Loader2, ArrowRight } from "lucide-react";
 import { useAuth } from "@/components/providers/AuthProvider";
 import { useCart } from "@/components/providers/CartProvider";
 
-export default function OrderSuccessPage() {
+function OrderSuccessContent() {
   const searchParams = useSearchParams();
   const sessionId = searchParams.get("session_id");
   const { user } = useAuth();
@@ -22,10 +22,8 @@ export default function OrderSuccessPage() {
 
   useEffect(() => {
     if (sessionId) {
-      // Clear the cart immediately
       clearCart();
 
-      // Poll for the order (webhook may take a moment)
       const checkOrder = async () => {
         try {
           const res = await fetch(`/api/checkout/verify?session_id=${sessionId}`);
@@ -35,7 +33,6 @@ export default function OrderSuccessPage() {
             setOrder(data.order);
             setLoading(false);
           } else if (data.pending) {
-            // Webhook hasn't processed yet, retry in 2 seconds
             setTimeout(checkOrder, 2000);
           } else {
             setError(data.error || "Order could not be found");
@@ -47,7 +44,6 @@ export default function OrderSuccessPage() {
         }
       };
 
-      // Start checking after 1 second to give webhook time
       const timer = setTimeout(checkOrder, 1500);
       return () => clearTimeout(timer);
     }
@@ -129,5 +125,17 @@ export default function OrderSuccessPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function OrderSuccessPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-[60vh] flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    }>
+      <OrderSuccessContent />
+    </Suspense>
   );
 }
