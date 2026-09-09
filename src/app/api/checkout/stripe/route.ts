@@ -153,7 +153,6 @@ export async function POST(req: NextRequest) {
         order_status: "pending",
         shipping_first_name: shippingAddress.first_name,
         shipping_last_name: shippingAddress.last_name,
-        shipping_email: shippingAddress.email,
         shipping_phone: shippingAddress.phone,
         shipping_address: shippingAddress.address_line1 + (shippingAddress.address_line2 ? ', ' + shippingAddress.address_line2 : ''),
         shipping_city: shippingAddress.city,
