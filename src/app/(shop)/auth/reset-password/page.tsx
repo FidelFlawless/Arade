@@ -22,12 +22,25 @@ export default function ResetPasswordPage() {
 
     const finalizeAuthCheck = async () => {
       const params = new URLSearchParams(window.location.search);
+      const hashParams = new URLSearchParams(window.location.hash.slice(1));
       const code = params.get("code");
       const tokenHash = params.get("token_hash");
       const type = params.get("type");
+      const accessToken = hashParams.get("access_token");
+      const refreshToken = hashParams.get("refresh_token");
+      const hashType = hashParams.get("type");
 
       try {
-        if (code) {
+        if (accessToken && refreshToken && hashType === "recovery") {
+          const { error } = await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken,
+          });
+          if (error) {
+            throw error;
+          }
+          window.history.replaceState(null, "", "/auth/reset-password");
+        } else if (code) {
           const { error } = await supabase.auth.exchangeCodeForSession(code);
           if (error) {
             throw error;

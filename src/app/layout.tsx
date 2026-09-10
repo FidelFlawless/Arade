@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Playfair_Display, Inter } from "next/font/google";
 import "./globals.css";
 import { absoluteUrl, DEFAULT_OG_IMAGE, SITE_NAME, SITE_URL } from "@/lib/seo";
+import RecoveryRedirect from "@/components/auth/RecoveryRedirect";
 
 const playfair = Playfair_Display({
   variable: "--font-playfair",
@@ -57,7 +58,10 @@ export default function RootLayout({
       lang="en"
       className={`${playfair.variable} ${inter.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col" suppressHydrationWarning>{children}</body>
+      <body className="min-h-full flex flex-col" suppressHydrationWarning>
+        <RecoveryRedirect />
+        {children}
+      </body>
     </html>
   );
 }
