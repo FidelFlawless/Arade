@@ -45,12 +45,12 @@ export default function ProductCard({ product }: { product: ProductCardProps }) 
   return (
     <div className="group card p-0 hover:shadow-lg">
       <Link href={`/product/${product.slug}`}>
-        <div className="aspect-square bg-muted relative overflow-hidden rounded-t-lg">
+        <div className="aspect-square bg-white relative overflow-hidden rounded-t-lg">
           {product.images && product.images[0] ? (
             <img
               src={product.images[0]}
               alt={product.name}
-              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+              className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300 p-1"
             />
           ) : (
             <div className="w-full h-full flex items-center justify-center text-foreground/30">No Image</div>
