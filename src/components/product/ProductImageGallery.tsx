@@ -35,6 +35,8 @@ export default function ProductImageGallery({ images, name }: Props) {
         <img
           src={allImages[selected]}
           alt={`${name} - Image ${selected + 1}`}
+          loading="eager"
+          decoding="async"
           className="w-full h-full object-cover"
         />
 
@@ -83,6 +85,8 @@ export default function ProductImageGallery({ images, name }: Props) {
               <img
                 src={img}
                 alt={`${name} thumbnail ${i + 1}`}
+                loading="lazy"
+                decoding="async"
                 className="w-full h-full object-cover"
               />
             </button>

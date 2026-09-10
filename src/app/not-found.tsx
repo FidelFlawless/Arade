@@ -15,6 +15,11 @@ export default function NotFound() {
         <Link href="/" className="btn-primary inline-block">
           Back to Home
         </Link>
+        <div className="mt-4 flex justify-center gap-4 text-sm">
+          <Link href="/shop" className="text-primary hover:underline">Shop all products</Link>
+          <Link href="/skincare" className="text-primary hover:underline">Skincare</Link>
+          <Link href="/beauty" className="text-primary hover:underline">Beauty</Link>
+        </div>
       </div>
     </div>
   );

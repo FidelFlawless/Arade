@@ -14,8 +14,8 @@ interface OrderItem {
   product_name: string;
   product_image: string | null;
   quantity: number;
-  price_cad: number;
-  price_usd: number;
+  unit_price: number;
+  subtotal: number;
 }
 
 interface Order {
@@ -88,7 +88,10 @@ export default function OrderDetailPage() {
   }
 
   const canReview = order.payment_status === "paid";
-  const fmt = (n: number) => (order.currency === "CAD" ? "C$" : "US$") + n.toFixed(2);
+  const fmt = (value: number | null | undefined) => {
+    const amount = Number(value ?? 0);
+    return (order.currency === "CAD" ? "C$" : "US$") + amount.toFixed(2);
+  };
 
   return (
     <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
@@ -130,9 +133,9 @@ export default function OrderDetailPage() {
                 {item.product_image && <img src={item.product_image} alt={item.product_name} className="w-14 h-14 object-cover rounded-lg" />}
                 <div className="flex-1">
                   <p className="font-medium">{item.product_name}</p>
-                  <p className="text-sm text-foreground/50">Qty: {item.quantity} x {fmt(order.currency === "CAD" ? item.price_cad : item.price_usd)}</p>
+                  <p className="text-sm text-foreground/50">Qty: {item.quantity} x {fmt(item.unit_price)}</p>
                 </div>
-                <p className="font-medium">{fmt((order.currency === "CAD" ? item.price_cad : item.price_usd) * item.quantity)}</p>
+                <p className="font-medium">{fmt(item.subtotal ?? item.unit_price * item.quantity)}</p>
               </div>
               {canReview && !reviewedProducts.has(item.product_id) && (
                 <ReviewForm

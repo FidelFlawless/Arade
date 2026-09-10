@@ -1,9 +1,50 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { Check, X } from "lucide-react";
 import AddToCartButton from "@/components/product/AddToCartButton";
 import ProductImageGallery from "@/components/product/ProductImageGallery";
+import { absoluteUrl, JsonLd, truncateDescription } from "@/lib/seo";
+
+const productFallbackDescription = "Shop this curated Arade beauty, skincare, hair or fashion product.";
+
+async function getProduct(slug: string) {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("products")
+    .select("*, categories(name, slug, parent_category_id)")
+    .eq("slug", slug)
+    .eq("is_active", true)
+    .single();
+  return data;
+}
+
+export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
+  const { slug } = await params;
+  const product = await getProduct(slug);
+  if (!product) return { title: "Product Not Found", robots: { index: false, follow: false } };
+
+  const categoryName = product.categories?.name || "Products";
+  const description = truncateDescription(product.description, productFallbackDescription);
+  const image = product.images?.[0] ? absoluteUrl(product.images[0]) : absoluteUrl("/image.png");
+
+  return {
+    title: product.name,
+    description,
+    alternates: { canonical: absoluteUrl(`/product/${product.slug}`) },
+    openGraph: {
+      title: `${product.name} | Arade`,
+      description,
+      url: absoluteUrl(`/product/${product.slug}`),
+      type: "website",
+      siteName: "Arade",
+      images: [{ url: image, alt: product.name }],
+    },
+    twitter: { card: "summary_large_image", title: `${product.name} | Arade`, description, images: [image] },
+    other: { "product:category": categoryName },
+  };
+}
 
 export default async function ProductPage({
   params,
@@ -13,12 +54,7 @@ export default async function ProductPage({
   const { slug } = await params;
   const supabase = await createClient();
 
-  const { data: product } = await supabase
-    .from("products")
-    .select("*, categories(name, slug, parent_category_id)")
-    .eq("slug", slug)
-    .eq("is_active", true)
-    .single();
+  const product = await getProduct(slug);
 
   // Fetch parent category if this is a subcategory
   let parentCategory: { name: string; slug: string } | null = null;
@@ -70,9 +106,61 @@ export default async function ProductPage({
   const parentSlug = parentCategory?.slug || categorySlug;
   const parentName = parentCategory?.name || categoryName;
   const isSubcategory = !!parentCategory;
+  const productSchema: Record<string, unknown> = {
+    "@context": "https://schema.org",
+    "@type": "Product",
+    name: product.name,
+    description: product.description,
+    image: (product.images || []).map((image: string) => absoluteUrl(image)),
+    category: categoryName,
+    sku: product.id,
+    url: absoluteUrl(`/product/${product.slug}`),
+    offers: [
+      {
+        "@type": "Offer",
+        url: absoluteUrl(`/product/${product.slug}`),
+        priceCurrency: "CAD",
+        price: product.price_cad,
+        availability: product.stock_quantity > 0 ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
+        itemCondition: "https://schema.org/NewCondition",
+      },
+      {
+        "@type": "Offer",
+        url: absoluteUrl(`/product/${product.slug}`),
+        priceCurrency: "USD",
+        price: product.price_usd,
+        availability: product.stock_quantity > 0 ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
+        itemCondition: "https://schema.org/NewCondition",
+      },
+    ],
+  };
+  if (reviewCount > 0) {
+    productSchema.aggregateRating = {
+      "@type": "AggregateRating",
+      ratingValue: avgRating,
+      reviewCount,
+    };
+  }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
+    <>
+      <JsonLd
+        data={{
+          "@context": "https://schema.org",
+          "@graph": [
+            productSchema,
+            {
+              "@type": "BreadcrumbList",
+              itemListElement: [
+                { "@type": "ListItem", position: 1, name: "Home", item: absoluteUrl("/") },
+                { "@type": "ListItem", position: 2, name: parentName, item: absoluteUrl(`/${parentSlug}`) },
+                { "@type": "ListItem", position: 3, name: product.name, item: absoluteUrl(`/product/${product.slug}`) },
+              ],
+            },
+          ],
+        }}
+      />
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
       {/* Breadcrumb */}
       <nav className="text-sm text-foreground/60 mb-8">
         <Link href="/" className="hover:text-primary">Home</Link>
@@ -226,6 +314,7 @@ export default async function ProductPage({
           </div>
         </div>
       )}
-    </div>
+      </div>
+    </>
   );
 }

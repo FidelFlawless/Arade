@@ -121,7 +121,7 @@ export default function SearchPanel({ isOpen, onClose }: SearchPanelProps) {
                   <Link key={product.id} href={`/product/${product.slug}`} onClick={handleResultClick} className="flex items-center gap-4 p-3 rounded-xl hover:bg-muted transition-colors group">
                     <div className="w-14 h-14 bg-muted rounded-lg overflow-hidden flex-shrink-0">
                       {product.images && product.images[0] ? (
-                        <img src={product.images[0]} alt={product.name} className="w-full h-full object-cover" />
+                        <img src={product.images[0]} alt={product.name} loading="lazy" decoding="async" className="w-full h-full object-cover" />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center text-foreground/20"><ShoppingBag className="w-5 h-5" /></div>
                       )}

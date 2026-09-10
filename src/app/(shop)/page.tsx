@@ -1,9 +1,24 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import { Leaf, Droplets, Rabbit, ShieldCheck, Droplet, Sparkles, Heart, Package, Flower2 } from "lucide-react";
 import NewsletterForm from "@/components/newsletter/NewsletterForm";
 import CategorySection from "@/components/home/CategorySection";
 import ProductCard from "@/components/product/ProductCard";
+import { absoluteUrl, JsonLd } from "@/lib/seo";
+
+export const metadata: Metadata = {
+  title: "Beauty, Skincare, Hair & Fashion",
+  description: "Shop thoughtfully curated beauty, skincare, hair and fashion essentials at Arade, serving customers across Canada and the United States.",
+  alternates: { canonical: absoluteUrl("/") },
+  openGraph: {
+    title: "Beauty, Skincare, Hair & Fashion | Arade",
+    description: "Shop thoughtfully curated beauty, skincare, hair and fashion essentials at Arade.",
+    url: absoluteUrl("/"),
+    type: "website",
+    images: [{ url: absoluteUrl("/image.png"), alt: "Arade beauty and fashion products" }],
+  },
+};
 
 export default async function HomePage() {
   const supabase = await createClient();
@@ -19,6 +34,30 @@ export default async function HomePage() {
 
   return (
     <div>
+      <JsonLd
+        data={{
+          "@context": "https://schema.org",
+          "@graph": [
+            {
+              "@type": "Organization",
+              name: "Arade",
+              url: absoluteUrl("/"),
+              logo: absoluteUrl("/logo.jpg"),
+              areaServed: ["CA", "US"],
+            },
+            {
+              "@type": "WebSite",
+              name: "Arade",
+              url: absoluteUrl("/"),
+              potentialAction: {
+                "@type": "SearchAction",
+                target: `${absoluteUrl("/shop")}?search={search_term_string}`,
+                "query-input": "required name=search_term_string",
+              },
+            },
+          ],
+        }}
+      />
       {/* Hero Section */}
       <section className="relative bg-[#d5c4a8] overflow-hidden">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -58,6 +97,9 @@ export default async function HomePage() {
               <img
                 src="/image.png"
                 alt="Arade Beauty Products"
+                width={800}
+                height={800}
+                fetchPriority="high"
                 className="w-full max-w-[320px] sm:max-w-[380px] lg:max-w-[500px] h-auto object-contain mix-blend-multiply" style={{ maskImage: "linear-gradient(to right, transparent 0%, black 15%)", WebkitMaskImage: "linear-gradient(to right, transparent 0%, black 15%)" }}
               />
             </div>
@@ -167,6 +209,9 @@ export default async function HomePage() {
               <img
                 src="/image.png"
                 alt="Arade New Collection"
+                width={800}
+                height={800}
+                loading="lazy"
                 className="w-full max-w-[250px] sm:max-w-[350px] lg:max-w-[480px] object-contain drop-shadow-2xl rounded-2xl"
               />
             </div>

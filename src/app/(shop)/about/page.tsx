@@ -1,10 +1,18 @@
 import { Metadata } from "next";
 import { SITE_NAME } from "@/lib/constants";
 import { Gem, Leaf, Globe } from "lucide-react";
+import { absoluteUrl } from "@/lib/seo";
 
 export const metadata: Metadata = {
-  title: "About Us",
+  title: "About Arade",
   description: "Learn about Arade, your destination for beauty, skincare, hair and fashion.",
+  alternates: { canonical: absoluteUrl("/about") },
+  openGraph: {
+    title: "About Arade",
+    description: "Learn about Arade, your destination for beauty, skincare, hair and fashion.",
+    url: absoluteUrl("/about"),
+    type: "website",
+  },
 };
 
 export default function AboutPage() {
@@ -45,7 +53,7 @@ export default function AboutPage() {
           </div>
         </div>
         <div className="rounded-2xl overflow-hidden bg-[#d5c4a8]/40">
-          <img src="/image.png" alt="Arade Beauty Products" className="w-full h-auto object-cover" />
+          <img src="/image.png" alt="Arade Beauty Products" width={800} height={800} loading="lazy" className="w-full h-auto object-cover" />
         </div>
       </div>
 
