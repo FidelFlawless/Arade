@@ -49,3 +49,4 @@ export async function GET(request: NextRequest) {
   // If error, redirect to login
   return NextResponse.redirect(`${origin}/auth/login?error=auth_callback_failed`);
 }
+
