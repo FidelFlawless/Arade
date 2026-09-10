@@ -18,33 +18,72 @@ export default function ResetPasswordPage() {
   const supabase = createClient();
 
   useEffect(() => {
-    // 1. Check if user came via a PKCE code in URL (?code=...)
-    const params = new URLSearchParams(window.location.search);
-    const code = params.get("code");
+    let isMounted = true;
 
-    if (code) {
-      supabase.auth.exchangeCodeForSession(code).then(({ error }) => {
-        if (error) {
-          setError("Recovery link is invalid or has expired.");
+    const finalizeAuthCheck = async () => {
+      const params = new URLSearchParams(window.location.search);
+      const code = params.get("code");
+      const tokenHash = params.get("token_hash");
+      const type = params.get("type");
+
+      try {
+        if (code) {
+          const { error } = await supabase.auth.exchangeCodeForSession(code);
+          if (error) {
+            throw error;
+          }
+        } else if (tokenHash && type) {
+          const { error } = await supabase.auth.verifyOtp({
+            type: type as "recovery",
+            token_hash: tokenHash,
+          });
+          if (error) {
+            throw error;
+          }
         }
-        setCheckingSession(false);
-      });
-    } else {
-      // 2. Check active session or listen for auth events
-      supabase.auth.getSession().then(() => {
-        setCheckingSession(false);
-      });
-    }
+
+        const {
+          data: { session },
+          error: sessionError,
+        } = await supabase.auth.getSession();
+
+        if (sessionError) {
+          throw sessionError;
+        }
+
+        if (!session) {
+          throw new Error("Auth session missing. This reset link is invalid or has expired.");
+        }
+
+        if (isMounted) {
+          setCheckingSession(false);
+        }
+      } catch (err) {
+        if (isMounted) {
+          setError(
+            err instanceof Error
+              ? err.message
+              : "Recovery link is invalid or has expired."
+          );
+          setCheckingSession(false);
+        }
+      }
+    };
+
+    finalizeAuthCheck();
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event) => {
-      if (event === "PASSWORD_RECOVERY") {
-        setCheckingSession(false);
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === "PASSWORD_RECOVERY" || session) {
+        if (isMounted) {
+          setCheckingSession(false);
+        }
       }
     });
 
     return () => {
+      isMounted = false;
       subscription.unsubscribe();
     };
   }, [supabase]);

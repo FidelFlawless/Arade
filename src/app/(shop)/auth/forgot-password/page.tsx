@@ -32,9 +32,14 @@ export default function ForgotPasswordPage() {
         return;
       }
 
-      // Account exists — send reset email
+      // Account exists — send reset email through the Supabase callback route
+      // so the recovery code/token is exchanged into a session before the user
+      // reaches the reset form.
+      const callbackUrl = new URL("/auth/callback", window.location.origin);
+      callbackUrl.searchParams.set("next", "/auth/reset-password");
+
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/auth/reset-password`,
+        redirectTo: callbackUrl.toString(),
       });
 
       if (error) {
