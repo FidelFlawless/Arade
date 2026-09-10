@@ -54,7 +54,24 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
       .select("*, profiles(full_name, email), order_items(*)")
       .eq("id", id)
       .single();
-    setOrder(data as OrderDetail | null);
+
+    const safeData = data
+      ? {
+          ...data,
+          subtotal: Number(data.subtotal ?? 0),
+          delivery_fee: Number(data.delivery_fee ?? 0),
+          discount: Number(data.discount ?? 0),
+          total: Number(data.total ?? 0),
+          order_items: (data.order_items ?? []).map((item: any) => ({
+            ...item,
+            quantity: Number(item.quantity ?? 0),
+            unit_price: Number(item.unit_price ?? 0),
+            total_price: Number(item.total_price ?? 0),
+          })),
+        }
+      : null;
+
+    setOrder(safeData as OrderDetail | null);
     setLoading(false);
   }
 
@@ -128,22 +145,26 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
           <div className="card">
             <h2 className="text-lg font-semibold text-foreground mb-4">Order Items</h2>
             <div className="space-y-3">
-              {order.order_items.map((item) => (
-                <div key={item.id} className="flex items-center justify-between py-3 border-b border-border last:border-0">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-muted rounded-lg flex items-center justify-center">
-                      <Package className="w-5 h-5 text-foreground/30" />
+              {(order.order_items ?? []).map((item) => {
+                const safeTotal = Number(item.total_price ?? 0);
+                const safeQty = Number(item.quantity ?? 0);
+                return (
+                  <div key={item.id} className="flex items-center justify-between py-3 border-b border-border last:border-0">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-muted rounded-lg flex items-center justify-center">
+                        <Package className="w-5 h-5 text-foreground/30" />
+                      </div>
+                      <div>
+                        <p className="font-medium text-foreground">{item.product_name || "Product"}</p>
+                        <p className="text-xs text-foreground/50">Qty: {safeQty}</p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="font-medium text-foreground">{item.product_name}</p>
-                      <p className="text-xs text-foreground/50">Qty: {item.quantity}</p>
-                    </div>
+                    <p className="text-sm font-medium">
+                      {(item.currency === "CAD" ? "C$" : "US$")}{safeTotal.toFixed(2)}
+                    </p>
                   </div>
-                  <p className="text-sm font-medium">
-                    {item.currency === "CAD" ? "C$" : "US$"}{item.total_price.toFixed(2)}
-                  </p>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         </div>
@@ -156,21 +177,21 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
             <div className="space-y-2 text-sm">
               <div className="flex justify-between">
                 <span className="text-foreground/60">Subtotal</span>
-                <span>{order.currency === "CAD" ? "C$" : "US$"}{order.subtotal.toFixed(2)}</span>
+                <span>{order.currency === "CAD" ? "C$" : "US$"}{Number(order.subtotal ?? 0).toFixed(2)}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-foreground/60">Delivery</span>
-                <span>{order.delivery_fee === 0 ? "Free" : `${order.currency === "CAD" ? "C$" : "US$"}${order.delivery_fee.toFixed(2)}`}</span>
+                <span>{Number(order.delivery_fee ?? 0) === 0 ? "Free" : `${order.currency === "CAD" ? "C$" : "US$"}${Number(order.delivery_fee ?? 0).toFixed(2)}`}</span>
               </div>
-              {order.discount > 0 && (
+              {Number(order.discount ?? 0) > 0 && (
                 <div className="flex justify-between text-green-600">
                   <span>Discount</span>
-                  <span>-{order.currency === "CAD" ? "C$" : "US$"}{order.discount.toFixed(2)}</span>
+                  <span>-{order.currency === "CAD" ? "C$" : "US$"}{Number(order.discount ?? 0).toFixed(2)}</span>
                 </div>
               )}
               <div className="flex justify-between font-semibold text-base pt-2 border-t border-border">
                 <span>Total</span>
-                <span>{order.currency === "CAD" ? "C$" : "US$"}{order.total.toFixed(2)}</span>
+                <span>{order.currency === "CAD" ? "C$" : "US$"}{Number(order.total ?? 0).toFixed(2)}</span>
               </div>
             </div>
           </div>
