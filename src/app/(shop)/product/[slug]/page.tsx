@@ -27,7 +27,8 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 
   const categoryName = product.categories?.name || "Products";
   const description = truncateDescription(product.description, productFallbackDescription);
-  const socialImage = absoluteUrl(`/api/og/product/${product.slug}`);
+  const productImage = product.images?.[0];
+  const socialImage = productImage ? (productImage.startsWith("http") ? productImage : absoluteUrl(productImage)) : absoluteUrl("/image.png");
 
   return {
     title: product.name,
@@ -39,7 +40,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
       url: absoluteUrl(`/product/${product.slug}`),
       type: "website",
       siteName: "Arade",
-      images: [{ url: socialImage, width: 1200, height: 630, alt: `${product.name} | Arade` }],
+      images: [{ url: socialImage, alt: product.name }],
     },
     twitter: { card: "summary_large_image", title: `${product.name} | Arade`, description, images: [socialImage] },
     other: { "product:category": categoryName },
