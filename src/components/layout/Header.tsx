@@ -17,6 +17,7 @@ export default function Header() {
   const { cartCount } = useCart();
   const [searchOpen, setSearchOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
+  const mobileMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setUserMenuOpen(false);
@@ -35,6 +36,20 @@ export default function Header() {
     document.addEventListener("pointerdown", handleOutsidePointer);
     return () => document.removeEventListener("pointerdown", handleOutsidePointer);
   }, [userMenuOpen]);
+
+  // Close mobile menu when clicking outside
+  useEffect(() => {
+    if (!mobileMenuOpen) return;
+
+    const handleMobileOutside = (event: PointerEvent) => {
+      if (!mobileMenuRef.current?.contains(event.target as Node)) {
+        setMobileMenuOpen(false);
+      }
+    };
+
+    document.addEventListener("pointerdown", handleMobileOutside);
+    return () => document.removeEventListener("pointerdown", handleMobileOutside);
+  }, [mobileMenuOpen]);
 
   return (
     <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-sm border-b border-border">
@@ -157,13 +172,6 @@ export default function Header() {
                       >
                         Saved Addresses
                       </Link>
-                      <Link
-                        href="/shop"
-                        className="block px-4 py-2 text-sm text-foreground/70 hover:bg-muted hover:text-primary"
-                        onClick={() => setUserMenuOpen(false)}
-                      >
-                        Continue Shopping
-                      </Link>
                       {profile?.role === "admin" && (
                         <Link
                           href="/admin"
@@ -213,7 +221,7 @@ export default function Header() {
 
         {/* Mobile menu */}
         {mobileMenuOpen && (
-          <div className="lg:hidden border-t border-border py-4">
+          <div ref={mobileMenuRef} className="lg:hidden border-t border-border py-4">
             <nav className="flex flex-col gap-2">
               {NAV_LINKS.map((link) => {
                 const isActive = pathname === link.href || pathname.startsWith(link.href + "/");

@@ -20,7 +20,9 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (!authLoading && user) {
-      router.replace("/account");
+      const params = new URLSearchParams(window.location.search);
+      const redirect = safeInternalRedirect(params.get("redirect"));
+      router.replace(redirect);
     }
   }, [authLoading, user, router]);
 
