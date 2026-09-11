@@ -18,7 +18,7 @@ export default function Header() {
   const [searchOpen, setSearchOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
   const mobileMenuRef = useRef<HTMLDivElement>(null);
-  const toggleBusy = useRef(false);
+  const mobileToggleRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     setUserMenuOpen(false);
@@ -38,13 +38,15 @@ export default function Header() {
     return () => document.removeEventListener("pointerdown", handleOutsidePointer);
   }, [userMenuOpen]);
 
-  // Close mobile menu when clicking outside (skip if toggle button was just clicked)
+  // Close mobile menu when clicking outside (ignore clicks on the toggle button —
+  // that button's own onClick handles opening/closing)
   useEffect(() => {
     if (!mobileMenuOpen) return;
 
     const handleMobileOutside = (event: PointerEvent) => {
-      if (toggleBusy.current) return;
-      if (!mobileMenuRef.current?.contains(event.target as Node)) {
+      const target = event.target as Node;
+      if (mobileToggleRef.current?.contains(target)) return;
+      if (!mobileMenuRef.current?.contains(target)) {
         setMobileMenuOpen(false);
       }
     };
@@ -208,11 +210,8 @@ export default function Header() {
             )}
 
             <button
-              onClick={() => {
-                toggleBusy.current = true;
-                setMobileMenuOpen(prev => !prev);
-                setTimeout(() => { toggleBusy.current = false; }, 50);
-              }}
+              ref={mobileToggleRef}
+              onClick={() => setMobileMenuOpen(prev => !prev)}
               className="lg:hidden p-2 text-foreground/60 hover:text-primary transition-colors"
               aria-label="Toggle mobile menu"
             >
