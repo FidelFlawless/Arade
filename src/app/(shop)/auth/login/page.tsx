@@ -18,11 +18,19 @@ export default function LoginPage() {
   const { user, loading: authLoading } = useAuth();
   const supabase = createClient();
 
+  // Get redirect URL from query params
+  const getRedirect = () => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      return safeInternalRedirect(params.get("redirect"));
+    }
+    return "/account";
+  };
+
+  // Redirect if already logged in (e.g. page refresh)
   useEffect(() => {
     if (!authLoading && user) {
-      const params = new URLSearchParams(window.location.search);
-      const redirect = safeInternalRedirect(params.get("redirect"));
-      router.replace(redirect);
+      router.replace(getRedirect());
     }
   }, [authLoading, user, router]);
 
@@ -39,21 +47,19 @@ export default function LoginPage() {
 
       if (error) {
         setError(error.message);
+        setLoading(false);
         return;
       }
 
-      const params = new URLSearchParams(window.location.search);
-      const redirect = safeInternalRedirect(params.get("redirect"));
-      router.push(redirect);
-      router.refresh();
+      // Auth state will update → useEffect will redirect
     } catch {
       setError("An unexpected error occurred. Please try again.");
-    } finally {
       setLoading(false);
     }
   };
 
-  if (authLoading || user) {
+  // Show spinner while loading, auth resolving, or already logged in
+  if (loading || authLoading || user) {
     return (
       <div className="min-h-[80vh] flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
