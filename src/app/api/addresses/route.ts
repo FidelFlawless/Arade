@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { isValidNorthAmericanPhone } from "@/lib/utils";
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -59,6 +60,13 @@ export async function POST(req: NextRequest) {
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = await req.json();
+
+  if (!body.phone || !isValidNorthAmericanPhone(body.phone)) {
+    return NextResponse.json(
+      { error: "A valid Canada or United States phone number is required" },
+      { status: 400 }
+    );
+  }
 
   // Delete all existing addresses (only allow one per user)
   await supabaseAdmin
@@ -145,6 +153,13 @@ export async function PUT(req: NextRequest) {
   const body = await req.json();
   const { id, ...updates } = body;
   if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
+
+  if (updates.phone !== undefined && !isValidNorthAmericanPhone(updates.phone)) {
+    return NextResponse.json(
+      { error: "A valid Canada or United States phone number is required" },
+      { status: 400 }
+    );
+  }
 
   // If setting as default, unset other defaults first
   if (updates.is_default) {

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 import { createClient } from "@supabase/supabase-js";
+import { isValidNorthAmericanPhone } from "@/lib/utils";
 
 function getStripe() {
   const rawKey = process.env.STRIPE_SECRET_KEY || "";
@@ -51,6 +52,13 @@ export async function POST(req: NextRequest) {
 
     if (country !== "CA" && country !== "US") {
       return NextResponse.json({ error: "Only Canada and USA are supported" }, { status: 400 });
+    }
+
+    if (!shippingAddress.phone || !isValidNorthAmericanPhone(shippingAddress.phone)) {
+      return NextResponse.json(
+        { error: "A valid Canada or United States phone number is required" },
+        { status: 400 }
+      );
     }
 
     // 3. Fetch actual prices from database (NEVER trust browser prices)
@@ -213,7 +221,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 9. Create Stripe Checkout Session
-    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://arade3.vercel.app";
+    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://aradeshop.com";
 
     const session = await stripe.checkout.sessions.create({
       mode: "payment",

@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { useAuth } from "@/components/providers/AuthProvider";
 import { Eye, EyeOff, Mail, Lock, User, Loader2, MailCheck } from "lucide-react";
 
 export default function SignupPage() {
@@ -16,7 +17,14 @@ export default function SignupPage() {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const router = useRouter();
+  const { user, loading: authLoading } = useAuth();
   const supabase = createClient();
+
+  useEffect(() => {
+    if (!authLoading && user) {
+      router.replace("/account");
+    }
+  }, [authLoading, user, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -57,6 +65,14 @@ export default function SignupPage() {
       setLoading(false);
     }
   };
+
+  if (authLoading || user) {
+    return (
+      <div className="min-h-[80vh] flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   if (success) {
     return (

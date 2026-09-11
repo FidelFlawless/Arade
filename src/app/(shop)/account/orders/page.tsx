@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useAuth } from "@/components/providers/AuthProvider";
 import { createClient } from "@/lib/supabase/client";
-import { Package, Loader2, ChevronRight } from "lucide-react";
+import { Package, Loader2, ChevronRight, XCircle, ArrowLeft } from "lucide-react";
 
 interface OrderRow {
   id: string;
@@ -30,6 +30,8 @@ export default function OrdersPage() {
   const { user, loading: authLoading } = useAuth();
   const [orders, setOrders] = useState<OrderRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [cancelling, setCancelling] = useState<string | null>(null);
+  const [error, setError] = useState("");
   const supabase = createClient();
 
   useEffect(() => {
@@ -53,6 +55,20 @@ export default function OrdersPage() {
 
     fetchOrders();
   }, [user, supabase]);
+
+  const cancelOrder = async (orderId: string) => {
+    if (!window.confirm("Cancel this pending order?")) return;
+    setCancelling(orderId);
+    setError("");
+    const response = await fetch(`/api/account/orders/${orderId}/cancel`, { method: "POST" });
+    const data = await response.json();
+    setCancelling(null);
+    if (!response.ok) {
+      setError(data.error || "Unable to cancel order.");
+      return;
+    }
+    setOrders((current) => current.map((order) => order.id === orderId ? { ...order, order_status: "cancelled" } : order));
+  };
 
   if (authLoading || loading) {
     return (
@@ -82,7 +98,16 @@ export default function OrdersPage() {
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
+      <Link
+        href="/account"
+        className="inline-flex items-center gap-2 text-sm text-foreground/60 hover:text-primary transition-colors mb-5"
+      >
+        <ArrowLeft className="w-4 h-4" />
+        Back to Account
+      </Link>
       <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-foreground mb-6 sm:mb-8">My Orders</h1>
+
+      {error && <div className="mb-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" role="status">{error}</div>}
 
       {orders.length === 0 ? (
         <div className="text-center py-16">
@@ -100,12 +125,11 @@ export default function OrdersPage() {
       ) : (
         <div className="space-y-4">
           {orders.map((order) => (
-            <Link
+            <div
               key={order.id}
-              href={`/order/${order.order_number}`}
               className="card flex items-center justify-between gap-4 hover:border-primary transition-colors"
             >
-              <div className="flex items-center gap-4">
+              <Link href={`/order/${order.order_number}`} className="flex min-w-0 flex-1 items-center gap-4">
                 <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center">
                   <Package className="w-6 h-6 text-primary" />
                 </div>
@@ -123,7 +147,7 @@ export default function OrdersPage() {
                     {(order.order_items?.length || 0) !== 1 ? "s" : ""}
                   </p>
                 </div>
-              </div>
+              </Link>
               <div className="flex items-center gap-4">
                 <div className="text-right">
                   <p className="font-semibold text-foreground">
@@ -141,7 +165,13 @@ export default function OrdersPage() {
                 </div>
                 <ChevronRight className="w-5 h-5 text-foreground/30" />
               </div>
-            </Link>
+              {(order.order_status || order.status || "pending") === "pending" && (
+                <button type="button" onClick={() => cancelOrder(order.id)} disabled={cancelling === order.id} className="inline-flex items-center gap-1 text-xs font-medium text-red-600 hover:text-red-700 disabled:opacity-50">
+                  <XCircle className="w-4 h-4" />
+                  {cancelling === order.id ? "Cancelling..." : "Cancel"}
+                </button>
+              )}
+            </div>
           ))}
         </div>
       )}

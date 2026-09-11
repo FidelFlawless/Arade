@@ -7,7 +7,7 @@ import { Lock, Loader2, CreditCard, ShoppingBag } from "lucide-react";
 import { useCart } from "@/components/providers/CartProvider";
 import { useAuth } from "@/components/providers/AuthProvider";
 import { createClient } from "@/lib/supabase/client";
-import { formatPrice } from "@/lib/utils";
+import { formatPrice, isValidNorthAmericanPhone } from "@/lib/utils";
 import { CANADIAN_PROVINCES, US_STATES } from "@/lib/constants";
 
 interface ShippingForm {
@@ -108,6 +108,9 @@ export default function CheckoutPage() {
     if (!form.province_state) newErrors.province_state = "Province/State is required";
     if (!form.postal_code.trim()) newErrors.postal_code = "Postal/ZIP code is required";
     if (!form.phone.trim()) newErrors.phone = "Phone number is required";
+    else if (!isValidNorthAmericanPhone(form.phone)) {
+      newErrors.phone = "Enter a valid Canada or United States phone number";
+    }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;

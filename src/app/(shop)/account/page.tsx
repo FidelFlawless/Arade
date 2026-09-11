@@ -3,8 +3,9 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/components/providers/AuthProvider";
-import { User, Package, MapPin, LogOut, Loader2 } from "lucide-react";
+import { User, Package, MapPin, LogOut, Loader2, ArrowLeft, Lock, Trash2, Eye, EyeOff } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { isValidNorthAmericanPhone } from "@/lib/utils";
 
 const accountLinks = [
   { href: "/account", label: "Profile", icon: User },
@@ -19,6 +20,20 @@ export default function AccountPage() {
   const [phone, setPhone] = useState(profile?.phone || "");
   const [country, setCountry] = useState(profile?.country || "CA");
   const [saving, setSaving] = useState(false);
+  const [phoneError, setPhoneError] = useState("");
+  const [accountMessage, setAccountMessage] = useState("");
+  const [accountError, setAccountError] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmNewPassword, setConfirmNewPassword] = useState("");
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [changingPassword, setChangingPassword] = useState(false);
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmNewPassword, setShowConfirmNewPassword] = useState(false);
+  const [passwordSaving, setPasswordSaving] = useState(false);
+  const [passwordError, setPasswordError] = useState("");
+  const [passwordMessage, setPasswordMessage] = useState("");
+  const [deletingAccount, setDeletingAccount] = useState(false);
   const supabase = createClient();
 
   if (loading) {
@@ -45,6 +60,14 @@ export default function AccountPage() {
   }
 
   const handleSave = async () => {
+    if (phone.trim() && !isValidNorthAmericanPhone(phone)) {
+      setPhoneError("Enter a valid Canada or United States phone number.");
+      return;
+    }
+
+    setPhoneError("");
+    setAccountMessage("");
+    setAccountError("");
     setSaving(true);
     const { error } = await supabase
       .from("profiles")
@@ -52,16 +75,84 @@ export default function AccountPage() {
       .eq("id", user.id);
     setSaving(false);
     if (error) {
-      alert("Failed to save: " + error.message);
+      setAccountError("We could not save your profile. Please try again.");
       return;
     }
+    setAccountMessage("Profile updated successfully.");
     setEditing(false);
-    window.location.reload();
+  };
+
+  const handlePasswordChange = async () => {
+    setPasswordError("");
+    setPasswordMessage("");
+    if (!currentPassword) {
+      setPasswordError("Enter your current password first.");
+      return;
+    }
+    if (newPassword.length < 8 || !/[A-Z]/.test(newPassword) || !/[a-z]/.test(newPassword) || !/\d/.test(newPassword)) {
+      setPasswordError("Use at least 8 characters with an uppercase letter, lowercase letter, and number.");
+      return;
+    }
+    if (newPassword !== confirmNewPassword) {
+      setPasswordError("The passwords do not match.");
+      return;
+    }
+
+    setPasswordSaving(true);
+    const { error: reauthenticationError } = await supabase.auth.signInWithPassword({
+      email: user.email || "",
+      password: currentPassword,
+    });
+    if (reauthenticationError) {
+      setPasswordSaving(false);
+      setPasswordError("Your current password is incorrect.");
+      return;
+    }
+
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    setPasswordSaving(false);
+    if (error) {
+      setPasswordError("We could not change your password. Please try again.");
+      return;
+    }
+    setNewPassword("");
+    setConfirmNewPassword("");
+    setCurrentPassword("");
+    setChangingPassword(false);
+    setPasswordMessage("Password changed successfully.");
+  };
+
+  const handleDeleteAccount = async () => {
+    if (!window.confirm("Delete your account and all associated test data? This cannot be undone.")) return;
+
+    setDeletingAccount(true);
+    setAccountError("");
+    const response = await fetch("/api/account/delete", { method: "DELETE" });
+    if (!response.ok) {
+      setDeletingAccount(false);
+      setAccountError("We could not delete your account. Please contact support.");
+      return;
+    }
+    await supabase.auth.signOut();
+    window.location.href = "/";
   };
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
+      <Link
+        href="/shop"
+        className="inline-flex items-center gap-2 text-sm text-foreground/60 hover:text-primary transition-colors mb-5"
+      >
+        <ArrowLeft className="w-4 h-4" />
+        Back to Shop
+      </Link>
       <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-foreground mb-6 sm:mb-8">My Account</h1>
+
+      {(accountMessage || accountError) && (
+        <div className={`mb-6 rounded-lg border px-4 py-3 text-sm ${accountError ? "border-red-200 bg-red-50 text-red-700" : "border-green-200 bg-green-50 text-green-700"}`} role="status">
+          {accountError || accountMessage}
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
         {/* Sidebar */}
@@ -147,10 +238,15 @@ export default function AccountPage() {
                   <input
                     type="tel"
                     value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    className="input"
-                    placeholder="+1 (555) 123-4567"
+                    onChange={(e) => {
+                      setPhone(e.target.value);
+                      setPhoneError("");
+                    }}
+                    className={`input ${phoneError ? "input-error" : ""}`}
+                    placeholder="+1 (416) 555-0123"
+                    inputMode="tel"
                   />
+                  {phoneError && <p className="text-xs text-red-600 mt-1">{phoneError}</p>}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-foreground mb-2">
@@ -236,6 +332,68 @@ export default function AccountPage() {
                 </div>
               </div>
             )}
+          </div>
+
+          <div className="card mt-6">
+            <div className="flex items-center gap-3 mb-4">
+              <Lock className="w-5 h-5 text-primary" />
+              <h2 className="text-xl font-semibold text-foreground">Security</h2>
+            </div>
+            <p className="text-sm text-foreground/60 mb-4">
+              Email verification: {user.email_confirmed_at ? "Verified" : "Not verified"}
+            </p>
+            {passwordError && <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">{passwordError}</div>}
+            {passwordMessage && <div className="mb-4 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-700" role="status">{passwordMessage}</div>}
+            {!changingPassword ? (
+              <button type="button" onClick={() => { setChangingPassword(true); setPasswordError(""); setPasswordMessage(""); }} className="btn-primary flex items-center gap-2">
+                <Lock className="w-4 h-4" />
+                Change Password
+              </button>
+            ) : (
+              <div className="space-y-4">
+                <p className="text-sm text-foreground/60">Verify your current password before choosing a new one.</p>
+                <div className="relative">
+                  <input type={showCurrentPassword ? "text" : "password"} value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} placeholder="Current password" autoComplete="current-password" className="input pr-12" />
+                  <button type="button" onClick={() => setShowCurrentPassword(!showCurrentPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-foreground/50 hover:text-foreground" aria-label={showCurrentPassword ? "Hide current password" : "Show current password"}>
+                    {showCurrentPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  </button>
+                </div>
+                <div className="relative">
+                  <input type={showNewPassword ? "text" : "password"} value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="New password" minLength={8} autoComplete="new-password" className="input pr-12" />
+                  <button type="button" onClick={() => setShowNewPassword(!showNewPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-foreground/50 hover:text-foreground" aria-label={showNewPassword ? "Hide new password" : "Show new password"}>
+                    {showNewPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  </button>
+                </div>
+                <div className="relative">
+                  <input type={showConfirmNewPassword ? "text" : "password"} value={confirmNewPassword} onChange={(e) => setConfirmNewPassword(e.target.value)} placeholder="Confirm new password" minLength={8} autoComplete="new-password" className="input pr-12" />
+                  <button type="button" onClick={() => setShowConfirmNewPassword(!showConfirmNewPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-foreground/50 hover:text-foreground" aria-label={showConfirmNewPassword ? "Hide confirmed password" : "Show confirmed password"}>
+                    {showConfirmNewPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  </button>
+                </div>
+                <p className="text-xs text-foreground/50">Password must contain 8+ characters, uppercase and lowercase letters, and a number.</p>
+                <div className="flex flex-wrap gap-3">
+                  <button type="button" onClick={handlePasswordChange} disabled={passwordSaving} className="btn-primary flex items-center gap-2 disabled:opacity-60">
+                    {passwordSaving && <Loader2 className="w-4 h-4 animate-spin" />}
+                    {passwordSaving ? "Updating Password..." : "Confirm Password Change"}
+                  </button>
+                  <button type="button" onClick={() => { setChangingPassword(false); setCurrentPassword(""); setNewPassword(""); setConfirmNewPassword(""); setPasswordError(""); }} className="btn-outline" disabled={passwordSaving}>
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="card mt-6 border-red-200">
+            <div className="flex items-center gap-3 mb-2">
+              <Trash2 className="w-5 h-5 text-red-600" />
+              <h2 className="text-xl font-semibold text-foreground">Delete Account</h2>
+            </div>
+            <p className="text-sm text-foreground/60 mb-4">Delete your account permanently. This action cannot be undone.</p>
+            <button type="button" onClick={handleDeleteAccount} disabled={deletingAccount} className="inline-flex items-center gap-2 rounded-lg border border-red-300 px-4 py-2.5 text-sm font-medium text-red-600 hover:bg-red-50 disabled:opacity-50">
+              {deletingAccount && <Loader2 className="w-4 h-4 animate-spin" />}
+              Delete My Account
+            </button>
           </div>
         </div>
       </div>

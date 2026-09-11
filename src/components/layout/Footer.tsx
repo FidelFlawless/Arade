@@ -19,6 +19,7 @@ const footerLinks = {
     { label: "Shipping Policy", href: "/shipping" },
     { label: "Return Policy", href: "/returns" },
     { label: "Privacy Policy", href: "/privacy" },
+    { label: "Terms & Conditions", href: "/terms" },
   ],
   support: [
     { label: "FAQ", href: "/faq" },

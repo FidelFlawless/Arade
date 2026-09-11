@@ -29,6 +29,7 @@ export async function GET(
     return new Response("Product not found", { status: 404 });
   }
 
+  const categoryName = (product.categories as Array<{ name?: string }> | null)?.[0]?.name || "Curated collection";
   const imageUrl = product.images?.[0];
   let productImage = "";
   if (imageUrl) {
@@ -60,7 +61,7 @@ export async function GET(
         <div style={{ display: "flex", flexDirection: "column" }}>
           <div style={{ fontSize: 28, letterSpacing: 7, color: "#8b5e3c", marginBottom: 28 }}>ARADE</div>
           <div style={{ fontSize: 18, letterSpacing: 3, color: "#8b5e3c", textTransform: "uppercase", marginBottom: 18 }}>
-            {product.categories?.name || "Curated collection"}
+            {categoryName}
           </div>
           <div style={{ fontSize: 48, lineHeight: 1.12, fontWeight: 700, maxWidth: 590 }}>
             {shorten(product.name, 60)}

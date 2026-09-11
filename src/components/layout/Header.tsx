@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { NAV_LINKS, SITE_NAME } from "@/lib/constants";
@@ -16,6 +16,25 @@ export default function Header() {
   const { user, profile, loading, signOut } = useAuth();
   const { cartCount } = useCart();
   const [searchOpen, setSearchOpen] = useState(false);
+  const userMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setUserMenuOpen(false);
+    setMobileMenuOpen(false);
+  }, [pathname]);
+
+  useEffect(() => {
+    if (!userMenuOpen) return;
+
+    const handleOutsidePointer = (event: PointerEvent) => {
+      if (!userMenuRef.current?.contains(event.target as Node)) {
+        setUserMenuOpen(false);
+      }
+    };
+
+    document.addEventListener("pointerdown", handleOutsidePointer);
+    return () => document.removeEventListener("pointerdown", handleOutsidePointer);
+  }, [userMenuOpen]);
 
   return (
     <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-sm border-b border-border">
@@ -26,7 +45,7 @@ export default function Header() {
             <img
               src="/logo.jpg"
               alt="Arade"
-              className="h-8 w-8 lg:h-10 lg:w-auto object-contain rounded-lg"
+              className="h-8 w-8 lg:h-10 lg:w-auto object-contain rounded-xl"
             />
             <span className="text-xl lg:text-3xl font-bold text-primary tracking-tight">
               {SITE_NAME}
@@ -91,7 +110,7 @@ export default function Header() {
                     Admin
                   </Link>
                 )}
-              <div className="relative">
+              <div ref={userMenuRef} className="relative">
                 <button
                   onClick={() => setUserMenuOpen(!userMenuOpen)}
                   className="flex items-center gap-1 sm:gap-2 p-1.5 sm:p-2 text-foreground/60 hover:text-primary transition-colors"
@@ -108,11 +127,6 @@ export default function Header() {
                 </button>
 
                 {userMenuOpen && (
-                  <>
-                    <div
-                      className="fixed inset-0 z-40"
-                      onClick={() => setUserMenuOpen(false)}
-                    />
                     <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-lg border border-border py-2 z-50">
                       <div className="px-4 py-2 border-b border-border">
                         <p className="text-sm font-medium text-foreground truncate">
@@ -143,6 +157,13 @@ export default function Header() {
                       >
                         Saved Addresses
                       </Link>
+                      <Link
+                        href="/shop"
+                        className="block px-4 py-2 text-sm text-foreground/70 hover:bg-muted hover:text-primary"
+                        onClick={() => setUserMenuOpen(false)}
+                      >
+                        Continue Shopping
+                      </Link>
                       {profile?.role === "admin" && (
                         <Link
                           href="/admin"
@@ -163,7 +184,6 @@ export default function Header() {
                         Sign Out
                       </button>
                     </div>
-                  </>
                 )}
               </div>
               </>

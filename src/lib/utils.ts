@@ -86,3 +86,22 @@ export function isValidUSZipCode(code: string): boolean {
   const regex = /^\d{5}(-\d{4})?$/;
   return regex.test(code);
 }
+
+// Canada and the United States use the North American Numbering Plan.
+export function isValidNorthAmericanPhone(phone: string): boolean {
+  const digits = phone.replace(/\D/g, "");
+  const nationalNumber = digits.length === 11 && digits.startsWith("1")
+    ? digits.slice(1)
+    : digits;
+
+  return nationalNumber.length === 10
+    && !nationalNumber.startsWith("0")
+    && !nationalNumber.startsWith("1")
+    && nationalNumber.slice(3, 4) !== "0"
+    && nationalNumber.slice(3, 4) !== "1";
+}
+
+export function safeInternalRedirect(value: string | null | undefined, fallback = "/account"): string {
+  if (!value || !value.startsWith("/") || value.startsWith("//")) return fallback;
+  return value;
+}

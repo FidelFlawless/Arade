@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useAuth } from "@/components/providers/AuthProvider";
 import { createClient } from "@/lib/supabase/client";
+import { isValidNorthAmericanPhone } from "@/lib/utils";
 import { MapPin, Plus, Edit2, Trash2, Loader2 } from "lucide-react";
 import { CANADIAN_PROVINCES, US_STATES } from "@/lib/constants";
 
@@ -108,6 +109,9 @@ export default function AddressesPage() {
     if (!form.province_state) newErrors.province_state = "Province/State is required";
     if (!form.postal_code.trim()) newErrors.postal_code = "Postal code is required";
     if (!form.phone.trim()) newErrors.phone = "Phone number is required";
+    else if (!isValidNorthAmericanPhone(form.phone)) {
+      newErrors.phone = "Enter a valid Canada or United States phone number";
+    }
     if (Object.keys(newErrors).length > 0) { setErrors(newErrors); return; }
     setErrors({});
     setSaving(true);

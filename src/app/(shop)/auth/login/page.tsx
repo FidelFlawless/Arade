@@ -1,9 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { useAuth } from "@/components/providers/AuthProvider";
+import { safeInternalRedirect } from "@/lib/utils";
 import { Eye, EyeOff, Mail, Lock, Loader2 } from "lucide-react";
 
 export default function LoginPage() {
@@ -13,7 +15,14 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const router = useRouter();
+  const { user, loading: authLoading } = useAuth();
   const supabase = createClient();
+
+  useEffect(() => {
+    if (!authLoading && user) {
+      router.replace("/account");
+    }
+  }, [authLoading, user, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -32,11 +41,7 @@ export default function LoginPage() {
       }
 
       const params = new URLSearchParams(window.location.search);
-      let redirect = params.get("redirect") || "/account";
-      // Security: only allow internal redirects
-      if (!redirect.startsWith("/") || redirect.startsWith("//")) {
-        redirect = "/account";
-      }
+      const redirect = safeInternalRedirect(params.get("redirect"));
       router.push(redirect);
       router.refresh();
     } catch {
@@ -45,6 +50,14 @@ export default function LoginPage() {
       setLoading(false);
     }
   };
+
+  if (authLoading || user) {
+    return (
+      <div className="min-h-[80vh] flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-[80vh] flex items-center justify-center py-12 px-4">
