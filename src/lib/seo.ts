@@ -12,7 +12,7 @@ export function absoluteUrl(path = "") {
 
 export function truncateDescription(value: string | null | undefined, fallback: string) {
   const text = value?.replace(/\s+/g, " ").trim() || fallback;
-  return text.length > 160 ? `${text.slice(0, 157).trimEnd()}...` : text;
+  return text.length > 145 ? `${text.slice(0, 142).trimEnd()}...` : text;
 }
 
 export function JsonLd({ data }: { data: Record<string, unknown> }) {
