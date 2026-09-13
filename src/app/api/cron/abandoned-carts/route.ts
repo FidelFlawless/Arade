@@ -103,9 +103,10 @@ async function sendAbandonedCartEmail(
 
 // GET - Called by Vercel cron every hour
 export async function GET(req: NextRequest) {
-  // Verify cron secret to prevent unauthorized access
+  // Optional: verify cron secret if set
   const authHeader = req.headers.get("authorization");
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  const cronSecret = process.env.CRON_SECRET;
+  if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
