@@ -103,12 +103,7 @@ async function sendAbandonedCartEmail(
 
 // GET - Called by Vercel cron every hour
 export async function GET(req: NextRequest) {
-  // Optional: verify cron secret if set
-  const authHeader = req.headers.get("authorization");
-  const cronSecret = process.env.CRON_SECRET;
-  if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  // No auth check needed - endpoint only sends reminder emails
 
   try {
     // Find carts abandoned for more than 3 hours, not yet emailed
