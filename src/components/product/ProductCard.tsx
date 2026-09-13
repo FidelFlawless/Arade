@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 
 import { useCart } from "@/components/providers/CartProvider";
 
@@ -47,12 +48,15 @@ export default function ProductCard({ product }: { product: ProductCardProps }) 
       <Link href={`/product/${product.slug}`}>
         <div className="aspect-square bg-white relative overflow-hidden rounded-t-lg">
           {product.images && product.images[0] ? (
-            <img
+            <Image
               src={product.images[0]}
               alt={product.name}
+              fill
+              sizes="(min-width: 1024px) 25vw, (min-width: 640px) 33vw, 50vw"
               loading="lazy"
               decoding="async"
-              className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300 p-1"
+              style={{ objectFit: "contain" }}
+              className="group-hover:scale-105 transition-transform duration-300 p-1"
             />
           ) : (
             <div className="w-full h-full flex items-center justify-center text-foreground/30">No Image</div>

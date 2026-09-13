@@ -15,7 +15,16 @@ interface OrderDetail {
   currency: string;
   order_status: string;
   payment_status: string;
-  shipping_address: any;
+  shipping_address: {
+    first_name?: string;
+    last_name?: string;
+    address_line1?: string;
+    address_line2?: string;
+    city?: string;
+    province_state?: string;
+    postal_code?: string;
+    phone?: string;
+  } | null;
   country: string;
   created_at: string;
   profiles: { full_name: string; email: string } | null;
@@ -62,7 +71,7 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
           delivery_fee: Number(data.delivery_fee ?? 0),
           discount: Number(data.discount ?? 0),
           total: Number(data.total ?? 0),
-          order_items: (data.order_items ?? []).map((item: any) => ({
+          order_items: (data.order_items ?? []).map((item: OrderDetail["order_items"][number]) => ({
             ...item,
             quantity: Number(item.quantity ?? 0),
             unit_price: Number(item.unit_price ?? 0),

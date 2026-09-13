@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { Search, X, Loader2, ArrowRight, ShoppingBag } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
@@ -119,9 +120,9 @@ export default function SearchPanel({ isOpen, onClose }: SearchPanelProps) {
               <div className="space-y-1">
                 {results.map((product) => (
                   <Link key={product.id} href={`/product/${product.slug}`} onClick={handleResultClick} className="flex items-center gap-4 p-3 rounded-xl hover:bg-muted transition-colors group">
-                    <div className="w-14 h-14 bg-muted rounded-lg overflow-hidden flex-shrink-0">
+                    <div className="relative w-14 h-14 bg-muted rounded-lg overflow-hidden flex-shrink-0">
                       {product.images && product.images[0] ? (
-                        <img src={product.images[0]} alt={product.name} loading="lazy" decoding="async" className="w-full h-full object-cover" />
+                        <Image src={product.images[0]} alt={product.name} fill sizes="56px" loading="lazy" decoding="async" style={{ objectFit: "cover" }} />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center text-foreground/20"><ShoppingBag className="w-5 h-5" /></div>
                       )}
@@ -134,14 +135,14 @@ export default function SearchPanel({ isOpen, onClose }: SearchPanelProps) {
                   </Link>
                 ))}
                 <Link href={`/shop?search=${encodeURIComponent(query)}`} onClick={handleResultClick} className="flex items-center justify-center gap-2 py-3 mt-2 text-sm font-medium text-primary hover:text-primary/80 transition-colors border-t border-border">
-                  View all results for "{query}" <ArrowRight className="w-4 h-4" />
+                  View all results for &quot;{query}&quot; <ArrowRight className="w-4 h-4" />
                 </Link>
               </div>
             )}
             {!loading && searched && results.length === 0 && (
               <div className="text-center py-12">
                 <ShoppingBag className="w-12 h-12 text-foreground/15 mx-auto mb-3" />
-                <p className="text-foreground/50 text-sm">No products found for "{query}"</p>
+                <p className="text-foreground/50 text-sm">No products found for &quot;{query}&quot;</p>
                 <p className="text-foreground/30 text-xs mt-1">Try a different search term</p>
               </div>
             )}

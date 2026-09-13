@@ -32,8 +32,8 @@ async function addContactToBrevo(email: string): Promise<{ ok: boolean; error?: 
 
     // 409 = contact already exists, that's fine
     return { ok: true };
-  } catch (err: any) {
-    return { ok: false, error: err.message || "Failed to reach Brevo" };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "Failed to reach Brevo" };
   }
 }
 
@@ -88,7 +88,7 @@ export async function POST(req: NextRequest) {
       status: "success",
       message: "You're subscribed! Welcome to Arade.",
     });
-  } catch (err: any) {
+  } catch (err) {
     console.error("Newsletter API error:", err);
     return NextResponse.json({ error: "Something went wrong. Please try again." }, { status: 500 });
   }

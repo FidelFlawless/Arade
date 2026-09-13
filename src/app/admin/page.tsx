@@ -10,8 +10,34 @@ const statusColors: Record<string, string> = {
   cancelled: "bg-red-100 text-red-800",
 };
 
+interface AdminOrderRow {
+  id: string;
+  order_number: string | null;
+  total: number | null;
+  currency: string | null;
+  order_status: string | null;
+  profiles: { full_name: string } | null;
+}
+
+interface AdminProductRow {
+  id: string;
+  name: string;
+  stock_quantity: number;
+  is_active: boolean;
+}
+
+interface AdminStats {
+  totalSales: number;
+  totalOrders: number;
+  totalCustomers: number;
+  totalProducts: number;
+  pendingOrders: number;
+  lowStock: AdminProductRow[];
+  recentOrders: AdminOrderRow[];
+}
+
 export default function AdminDashboard() {
-  const [stats, setStats] = useState<any>(null);
+  const [stats, setStats] = useState<AdminStats | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => { loadStats(); }, []);
@@ -23,13 +49,13 @@ export default function AdminDashboard() {
       fetch("/api/admin/products"),
     ]);
 
-    const orders = ordersRes.ok ? await ordersRes.json() : [];
+    const orders: AdminOrderRow[] = ordersRes.ok ? await ordersRes.json() : [];
     const customers = customersRes.ok ? await customersRes.json() : [];
-    const products = productsRes.ok ? await productsRes.json() : [];
+    const products: AdminProductRow[] = productsRes.ok ? await productsRes.json() : [];
 
-    const totalSales = orders.filter((o: any) => o.currency === "CAD").reduce((s: number, o: any) => s + (o.total || 0), 0);
-    const pendingOrders = orders.filter((o: any) => o.order_status === "pending").length;
-    const lowStock = products.filter((p: any) => p.is_active && p.stock_quantity < 10).slice(0, 5);
+    const totalSales = orders.filter((o) => o.currency === "CAD").reduce((s, o) => s + (o.total || 0), 0);
+    const pendingOrders = orders.filter((o) => o.order_status === "pending").length;
+    const lowStock = products.filter((p) => p.is_active && p.stock_quantity < 10).slice(0, 5);
     const recentOrders = orders.slice(0, 5);
 
     setStats({ totalSales, totalOrders: orders.length, totalCustomers: customers.length, totalProducts: products.length, pendingOrders, lowStock, recentOrders });
@@ -73,7 +99,7 @@ export default function AdminDashboard() {
               <h2 className="text-lg font-semibold">Recent Orders</h2>
               <Link href="/admin/orders" className="text-sm text-primary hover:text-primary-dark">View all</Link>
             </div>
-            {stats?.recentOrders?.length > 0 ? (
+            {stats && stats.recentOrders.length > 0 ? (
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead><tr className="border-b border-border">
@@ -83,12 +109,12 @@ export default function AdminDashboard() {
                     <th className="text-left text-sm font-medium text-foreground/60 pb-3">Status</th>
                   </tr></thead>
                   <tbody>
-                    {stats.recentOrders.map((order: any) => (
+                    {stats.recentOrders.map((order) => (
                       <tr key={order.id} className="border-b border-border last:border-0">
                         <td className="py-3"><Link href={`/admin/orders/${order.id}`} className="font-medium text-primary hover:text-primary-dark">{order.order_number || order.id.slice(0, 8)}</Link></td>
                         <td className="py-3 text-sm text-foreground/70">{order.profiles?.full_name || "Customer"}</td>
                         <td className="py-3 text-sm font-medium">{order.currency === "CAD" ? "C$" : "US$"}{order.total?.toFixed(2)}</td>
-                        <td className="py-3"><span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${statusColors[order.order_status] || "bg-gray-100"}`}>{order.order_status?.charAt(0).toUpperCase() + order.order_status?.slice(1)}</span></td>
+                        <td className="py-3"><span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${statusColors[order.order_status ?? ""] || "bg-gray-100"}`}>{(order.order_status ?? "").charAt(0).toUpperCase() + (order.order_status ?? "").slice(1)}</span></td>
                       </tr>
                     ))}
                   </tbody>
@@ -101,9 +127,9 @@ export default function AdminDashboard() {
         <div className="space-y-6">
           <div className="card">
             <div className="flex items-center gap-2 mb-4"><AlertTriangle className="w-5 h-5 text-yellow-500" /><h2 className="text-lg font-semibold">Low Stock Alert</h2></div>
-            {stats?.lowStock?.length > 0 ? (
+            {stats && stats.lowStock.length > 0 ? (
               <div className="space-y-3">
-                {stats.lowStock.map((p: any) => (
+                {stats.lowStock.map((p) => (
                   <div key={p.id} className="flex items-center justify-between">
                     <p className="text-sm text-foreground/70 truncate mr-2">{p.name}</p>
                     <span className="text-xs font-medium text-red-600 bg-red-50 px-2 py-0.5 rounded-full whitespace-nowrap">{p.stock_quantity} left</span>

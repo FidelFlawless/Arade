@@ -26,8 +26,8 @@ export const metadata: Metadata = {
     "Shop thoughtfully curated beauty, skincare, hair and fashion essentials at Arade, serving customers across Canada and the United States.",
   authors: [{ name: "Arade" }],
   icons: {
-    icon: [{ url: "/logo.jpg", type: "image/jpeg" }],
-    apple: [{ url: "/logo.jpg", type: "image/jpeg" }],
+    icon: [{ url: "/icon.png", type: "image/png" }],
+    apple: [{ url: "/logo.webp", type: "image/webp" }],
   },
   alternates: { canonical: absoluteUrl("/") },
   robots: { index: true, follow: true },

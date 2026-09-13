@@ -62,8 +62,11 @@ export default function Header() {
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2">
             <img
-              src="/logo.jpg"
+              src="/logo.webp"
               alt="Arade"
+              width={512}
+              height={512}
+              decoding="async"
               className="h-8 w-8 lg:h-10 lg:w-auto object-contain rounded-xl"
             />
             <span className="text-xl lg:text-3xl font-bold text-primary tracking-tight">

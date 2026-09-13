@@ -17,5 +17,5 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function FashionPage() {
   const category = await getActiveCategory("fashion");
-  return <><JsonLd data={{ "@context": "https://schema.org", "@type": "CollectionPage", name: category?.name || "Fashion", description: category?.description || fallbackDescription, url: absoluteUrl("/fashion"), isPartOf: { "@type": "WebSite", name: "Arade", url: absoluteUrl("/") } }} /><CategoryPage categorySlug="fashion" title="Fashion" description="Find pieces that express your personal style. Dresses, tops and accessories curated for every occasion." /></>;
+  return <><JsonLd data={{ "@context": "https://schema.org", "@graph": [ { "@type": "CollectionPage", name: category?.name || "Fashion", description: category?.description || fallbackDescription, url: absoluteUrl("/fashion"), isPartOf: { "@type": "WebSite", name: "Arade", url: absoluteUrl("/") } }, { "@type": "BreadcrumbList", itemListElement: [ { "@type": "ListItem", position: 1, name: "Home", item: absoluteUrl("/") }, { "@type": "ListItem", position: 2, name: category?.name || "Fashion", item: absoluteUrl("/fashion") } ] } ] }} /><CategoryPage categorySlug="fashion" title="Fashion" description="Find pieces that express your personal style. Dresses, tops and accessories curated for every occasion." /></>;
 }

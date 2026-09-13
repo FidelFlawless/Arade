@@ -1,11 +1,12 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import Image from "next/image";
 import { createClient } from "@/lib/supabase/server";
 import { Check, X } from "lucide-react";
 import AddToCartButton from "@/components/product/AddToCartButton";
 import ProductImageGallery from "@/components/product/ProductImageGallery";
-import { absoluteUrl, JsonLd, truncateDescription } from "@/lib/seo";
+import { absoluteUrl, DEFAULT_OG_IMAGE, JsonLd, truncateDescription } from "@/lib/seo";
 
 const productFallbackDescription = "Shop this curated Arade beauty, skincare, hair or fashion product.";
 
@@ -28,7 +29,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const categoryName = product.categories?.name || "Products";
   const description = truncateDescription(product.description, productFallbackDescription);
   const productImage = product.images?.[0];
-  const socialImage = productImage ? (productImage.startsWith("http") ? productImage : absoluteUrl(productImage)) : absoluteUrl("/image.png");
+  const socialImage = productImage ? (productImage.startsWith("http") ? productImage : absoluteUrl(productImage)) : absoluteUrl(DEFAULT_OG_IMAGE);
 
   return {
     title: product.name,
@@ -69,7 +70,24 @@ export default async function ProductPage({
   }
 
   
-  let approvedReviews: any[] = [];
+  interface ProductReviewRow {
+    id: string;
+    rating: number;
+    comment: string | null;
+    is_verified: boolean;
+    created_at: string;
+    profiles: { full_name: string } | null;
+  }
+
+  interface RelatedProductRow {
+    id: string;
+    name: string;
+    slug: string;
+    price_cad: number;
+    images: string[] | null;
+  }
+
+  let approvedReviews: ProductReviewRow[] = [];
   let avgRating = 0;
   let reviewCount = 0;
   if (product) {
@@ -79,14 +97,14 @@ export default async function ProductPage({
       .eq("product_id", product.id)
       .eq("is_approved", true)
       .order("created_at", { ascending: false });
-    approvedReviews = revs || [];
+    approvedReviews = (revs as ProductReviewRow[]) || [];
     reviewCount = approvedReviews.length;
     if (reviewCount > 0) {
-      avgRating = Math.round((approvedReviews.reduce((sum: number, r: any) => sum + r.rating, 0) / reviewCount) * 10) / 10;
+      avgRating = Math.round((approvedReviews.reduce((sum, r) => sum + r.rating, 0) / reviewCount) * 10) / 10;
     }
   }
 
-  let relatedProducts: any[] = [];
+  let relatedProducts: RelatedProductRow[] = [];
   if (product) {
     const { data: related } = await supabase
       .from("products")
@@ -95,7 +113,7 @@ export default async function ProductPage({
       .eq("category_id", product.category_id)
       .neq("id", product.id)
       .limit(4);
-    relatedProducts = related || [];
+    relatedProducts = (related as RelatedProductRow[]) || [];
   }
 
   if (!product) {
@@ -111,7 +129,8 @@ export default async function ProductPage({
     "@context": "https://schema.org",
     "@type": "Product",
     name: product.name,
-    description: product.description,
+    // Safe SEO fallback based only on real product info — never fabricated.
+    description: truncateDescription(product.description, productFallbackDescription),
     image: (product.images || []).map((image: string) => absoluteUrl(image)),
     category: categoryName,
     sku: product.id,
@@ -301,7 +320,16 @@ export default async function ProductPage({
               <a key={rp.id} href={"/product/" + rp.slug} className="group card p-0 hover:shadow-lg">
                 <div className="aspect-[4/3] bg-muted relative overflow-hidden rounded-t-lg">
                   {rp.images && rp.images[0] ? (
-                    <img src={rp.images[0]} alt={rp.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                    <Image
+                      src={rp.images[0]}
+                      alt={rp.name}
+                      fill
+                      sizes="(min-width: 1024px) 25vw, 50vw"
+                      loading="lazy"
+                      decoding="async"
+                      style={{ objectFit: "cover" }}
+                      className="group-hover:scale-105 transition-transform duration-300"
+                    />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-foreground/30">No Image</div>
                   )}

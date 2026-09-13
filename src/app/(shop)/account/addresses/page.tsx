@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useAuth } from "@/components/providers/AuthProvider";
-import { createClient } from "@/lib/supabase/client";
 import { isValidNorthAmericanPhone } from "@/lib/utils";
 import { MapPin, Plus, Edit2, Trash2, Loader2 } from "lucide-react";
 import { CANADIAN_PROVINCES, US_STATES } from "@/lib/constants";
@@ -56,10 +55,9 @@ export default function AddressesPage() {
   const [addresses, setAddresses] = useState<AddressRow[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState<AddressForm>(emptyForm);
-  const [addressesLoading, setAddressesLoading] = useState(true);
+  const [, setAddressesLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const supabase = createClient();
 
   useEffect(() => {
     if (!user) { setAddressesLoading(false); return; }

@@ -20,7 +20,7 @@ const defaultSettings: Settings = {
 export default function ContactPage() {
   const [settings, setSettings] = useState<Settings>(defaultSettings);
   const [form, setForm] = useState({ name: "", email: "", subject: "", message: "" });
-  const [loading, setLoading] = useState(false);
+  const [loading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 

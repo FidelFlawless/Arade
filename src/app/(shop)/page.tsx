@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
-import { Leaf, Droplets, Rabbit, ShieldCheck, Droplet, Sparkles, Heart, Package, Flower2 } from "lucide-react";
+import { Leaf, Droplets, Rabbit, ShieldCheck } from "lucide-react";
 import NewsletterForm from "@/components/newsletter/NewsletterForm";
 import CategorySection from "@/components/home/CategorySection";
 import ProductCard from "@/components/product/ProductCard";
@@ -16,7 +16,7 @@ export const metadata: Metadata = {
     description: "Shop thoughtfully curated beauty, skincare, hair and fashion essentials at Arade.",
     url: absoluteUrl("/"),
     type: "website",
-    images: [{ url: absoluteUrl("/image.png"), alt: "Arade beauty and fashion products" }],
+    images: [{ url: absoluteUrl("/og-image.webp"), alt: "Arade beauty and fashion products" }],
   },
 };
 
@@ -42,7 +42,7 @@ export default async function HomePage() {
               "@type": "Organization",
               name: "Arade",
               url: absoluteUrl("/"),
-              logo: absoluteUrl("/logo.jpg"),
+              logo: absoluteUrl("/logo.webp"),
               areaServed: ["CA", "US"],
             },
             {
@@ -95,12 +95,13 @@ export default async function HomePage() {
             {/* Right image */}
             <div className="relative flex justify-center lg:justify-end items-center">
               <img
-                src="/image.png"
+                src="/image.webp"
                 alt="Arade Beauty Products"
-                width={800}
-                height={800}
+                width={1536}
+                height={1024}
                 fetchPriority="high"
-                className="w-full max-w-[320px] sm:max-w-[380px] lg:max-w-[500px] h-auto object-contain mix-blend-multiply" style={{ maskImage: "linear-gradient(to right, transparent 0%, black 15%)", WebkitMaskImage: "linear-gradient(to right, transparent 0%, black 15%)" }}
+                className="w-full max-w-[320px] sm:max-w-[380px] lg:max-w-[500px] h-auto object-contain mix-blend-multiply"
+                style={{ maskImage: "linear-gradient(to right, transparent 0%, black 15%)", WebkitMaskImage: "linear-gradient(to right, transparent 0%, black 15%)" }}
               />
             </div>
           </div>
@@ -207,10 +208,10 @@ export default async function HomePage() {
             {/* Right image */}
             <div className="relative flex justify-center lg:justify-end items-center py-6 sm:py-8 lg:py-0">
               <img
-                src="/image.png"
+                src="/image.webp"
                 alt="Arade New Collection"
-                width={800}
-                height={800}
+                width={1536}
+                height={1024}
                 loading="lazy"
                 className="w-full max-w-[250px] sm:max-w-[350px] lg:max-w-[480px] object-contain drop-shadow-2xl rounded-2xl"
               />

@@ -23,6 +23,18 @@ interface ShippingForm {
   postal_code: string;
 }
 
+interface SavedAddress {
+  is_default?: boolean;
+  first_name?: string;
+  last_name?: string;
+  address_line1?: string;
+  address_line2?: string;
+  city?: string;
+  province_state?: string;
+  postal_code?: string;
+  country?: string;
+}
+
 export default function CheckoutPage() {
   const [form, setForm] = useState<ShippingForm>({
     first_name: "",
@@ -41,8 +53,8 @@ export default function CheckoutPage() {
   const { items: cartItems } = useCart();
   const supabase = createClient();
   const [loading, setLoading] = useState(false);
-  const [savedAddresses, setSavedAddresses] = useState<any[]>([]);
-  const [loadingAddresses, setLoadingAddresses] = useState(true);
+  const [, setSavedAddresses] = useState<SavedAddress[]>([]);
+  const [, setLoadingAddresses] = useState(true);
   const [errors, setErrors] = useState<Partial<Record<keyof ShippingForm, string>>>({});
 
   useEffect(() => { if (!authLoading && !user) router.push("/auth/login?redirect=/checkout"); }, [user, authLoading, router]);
@@ -56,7 +68,7 @@ export default function CheckoutPage() {
         const data = res.ok ? await res.json() : [];
         setSavedAddresses(data || []);
         setLoadingAddresses(false);
-        const def = data?.find((a: any) => a.is_default) || data?.[0];
+        const def = data?.find((a: SavedAddress) => a.is_default) || data?.[0];
         if (def) setForm(prev => ({ ...prev, first_name: def.first_name || prev.first_name, last_name: def.last_name || prev.last_name, address_line1: def.address_line1 || "", address_line2: def.address_line2 || "", city: def.city || "", province_state: def.province_state || "", postal_code: def.postal_code || "", country: def.country || "CA" }));
       };
       loadAddresses();

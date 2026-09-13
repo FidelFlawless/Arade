@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
 interface Props {
@@ -32,12 +33,13 @@ export default function ProductImageGallery({ images, name }: Props) {
     <div className="space-y-3">
       {/* Main image */}
       <div className="relative bg-muted rounded-2xl overflow-hidden aspect-square group">
-        <img
+        <Image
           src={allImages[selected]}
           alt={`${name} - Image ${selected + 1}`}
-          loading="eager"
+          fill
+          sizes="(min-width: 1024px) 40vw, 90vw"
           decoding="async"
-          className="w-full h-full object-cover"
+          style={{ objectFit: "cover" }}
         />
 
         {/* Navigation arrows (only if more than 1 image) */}
@@ -75,19 +77,21 @@ export default function ProductImageGallery({ images, name }: Props) {
             <button
               key={i}
               onClick={() => setSelected(i)}
-              className={`w-16 h-16 sm:w-20 sm:h-20 rounded-lg overflow-hidden flex-shrink-0 border-2 transition-all cursor-pointer ${
+              className={`relative w-16 h-16 sm:w-20 sm:h-20 rounded-lg overflow-hidden flex-shrink-0 border-2 transition-all cursor-pointer ${
                 i === selected
                   ? "border-primary ring-2 ring-primary/20"
                   : "border-transparent hover:border-foreground/20"
               }`}
               aria-label={`View image ${i + 1}`}
             >
-              <img
+              <Image
                 src={img}
                 alt={`${name} thumbnail ${i + 1}`}
+                fill
+                sizes="80px"
                 loading="lazy"
                 decoding="async"
-                className="w-full h-full object-cover"
+                style={{ objectFit: "cover" }}
               />
             </button>
           ))}

@@ -34,11 +34,25 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
 
   useEffect(() => { loadProduct(); loadCategories(); }, [id]);
 
+  interface AdminProductData {
+    id: string;
+    name: string;
+    slug: string;
+    description: string | null;
+    price_cad: number | null;
+    price_usd: number | null;
+    stock_quantity: number | null;
+    is_active: boolean;
+    is_featured: boolean;
+    images: string[] | null;
+    category_id: string | null;
+  }
+
   async function loadProduct() {
     const res = await fetch("/api/admin/products");
     if (res.ok) {
       const products = await res.json();
-      const data = products.find((p: any) => p.id === id);
+      const data = products.find((p: AdminProductData) => p.id === id);
       if (data) {
         setForm({
           name: data.name || "", slug: data.slug || "", description: data.description || "",

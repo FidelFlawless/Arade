@@ -17,5 +17,5 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function HairPage() {
   const category = await getActiveCategory("hair");
-  return <><JsonLd data={{ "@context": "https://schema.org", "@type": "CollectionPage", name: category?.name || "Hair", description: category?.description || fallbackDescription, url: absoluteUrl("/hair"), isPartOf: { "@type": "WebSite", name: "Arade", url: absoluteUrl("/") } }} /><CategoryPage categorySlug="hair" title="Hair" description="Explore wigs, hair care and accessories. Quality products to help you achieve your desired look." /></>;
+  return <><JsonLd data={{ "@context": "https://schema.org", "@graph": [ { "@type": "CollectionPage", name: category?.name || "Hair", description: category?.description || fallbackDescription, url: absoluteUrl("/hair"), isPartOf: { "@type": "WebSite", name: "Arade", url: absoluteUrl("/") } }, { "@type": "BreadcrumbList", itemListElement: [ { "@type": "ListItem", position: 1, name: "Home", item: absoluteUrl("/") }, { "@type": "ListItem", position: 2, name: category?.name || "Hair", item: absoluteUrl("/hair") } ] } ] }} /><CategoryPage categorySlug="hair" title="Hair" description="Explore wigs, hair care and accessories. Quality products to help you achieve your desired look." /></>;
 }

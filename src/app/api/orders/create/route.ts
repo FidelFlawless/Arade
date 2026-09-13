@@ -170,7 +170,7 @@ export async function POST(req: NextRequest) {
       subtotal,
       deliveryFee,
     });
-  } catch (error) {
+  } catch {
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

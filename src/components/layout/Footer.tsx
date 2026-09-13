@@ -3,7 +3,7 @@
 
 import Link from "next/link";
 import { SITE_NAME } from "@/lib/constants";
-import { Facebook, Instagram, Twitter } from "lucide-react";
+import { Facebook, Instagram } from "lucide-react";
 
 const footerLinks = {
   categories: [
@@ -116,11 +116,14 @@ export default function Footer() {
               <a href="#" className="text-white/40 hover:text-white transition-colors" aria-label="Facebook">
                 <Facebook className="w-6 h-6" aria-hidden="true" />
               </a>
-              <a href="#" className="text-white/40 hover:text-white transition-colors" aria-label="Instagram">
+              <a
+                href="https://www.instagram.com/arade_beauty?stkn=MWp1MW4zenZ4OXNkNA%3D%3D&utm_source=qr"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-white/40 hover:text-white transition-colors"
+                aria-label="Instagram"
+              >
                 <Instagram className="w-6 h-6" aria-hidden="true" />
-              </a>
-              <a href="#" className="text-white/40 hover:text-white transition-colors" aria-label="Twitter">
-                <Twitter className="w-6 h-6" aria-hidden="true" />
               </a>
             </div>
           </div>

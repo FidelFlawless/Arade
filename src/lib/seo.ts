@@ -3,7 +3,7 @@ import { createElement } from "react";
 
 export const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || "https://aradeshop.com").replace(/\/$/, "");
 export const SITE_NAME = "Arade";
-export const DEFAULT_OG_IMAGE = "/image.png";
+export const DEFAULT_OG_IMAGE = "/og-image.webp";
 
 export function absoluteUrl(path = "") {
   if (/^https?:\/\//i.test(path)) return path;

@@ -7,7 +7,7 @@ const supabaseAdmin = createClient(
 );
 
 // GET - List all products (admin only)
-export async function GET(req: NextRequest) {
+export async function GET() {
   const { data, error } = await supabaseAdmin
     .from("products")
     .select("*, categories(name, slug)")

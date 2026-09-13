@@ -53,7 +53,7 @@ export default function AboutPage() {
           </div>
         </div>
         <div className="rounded-2xl overflow-hidden bg-[#d5c4a8]/40">
-          <img src="/image.png" alt="Arade Beauty Products" width={800} height={800} loading="lazy" className="w-full h-auto object-cover" />
+          <img src="/image.webp" alt="Arade Beauty Products" width={1536} height={1024} loading="lazy" decoding="async" className="w-full h-auto object-cover" />
         </div>
       </div>
 
