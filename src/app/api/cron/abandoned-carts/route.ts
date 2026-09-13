@@ -141,6 +141,13 @@ export async function GET(req: NextRequest) {
         }
       }
 
+      // Postgres NUMERIC columns arrive as strings from Supabase -
+      // coerce to number to avoid `.toFixed(2)` runtime crashes
+      const cartTotal =
+        typeof cart.cart_total === "string"
+          ? parseFloat(cart.cart_total) || 0
+          : cart.cart_total || 0;
+
       const sent = await sendAbandonedCartEmail(
         cart.email,
         firstName,
