@@ -98,7 +98,12 @@ export function CartProvider({ children }: { children: ReactNode }) {
           cartTotal,
           currency: "CAD",
         }),
-      }).catch(() => {});
+      }).catch((err) => {
+        // Track failures silently in prod, but surface in console for debugging
+        if (process.env.NODE_ENV !== "production") {
+          console.warn("[CartProvider] Failed to track cart:", err);
+        }
+      });
     }, 2000);
 
     return () => {
