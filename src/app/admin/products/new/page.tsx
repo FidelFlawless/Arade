@@ -3,8 +3,9 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Loader2, X, ImageIcon } from "lucide-react";
+import { ArrowLeft, Loader2, X, ImageIcon, RefreshCw } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { useExchangeRate } from "@/hooks/useExchangeRate";
 
 interface Category {
   id: string;
@@ -27,6 +28,8 @@ export default function NewProductPage() {
     is_active: true, is_featured: false,
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [usdManuallyEdited, setUsdManuallyEdited] = useState(false);
+  const { rate, loading: rateLoading, lastUpdated, convertCadToUsd } = useExchangeRate();
   const supabase = createClient();
 
   useEffect(() => {
@@ -151,14 +154,24 @@ export default function NewProductPage() {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
               <label className="block text-sm font-medium text-foreground mb-2">Price (CAD) *</label>
-              <input type="number" value={form.price_cad} onChange={(e) => setForm({ ...form, price_cad: e.target.value })}
+              <input type="number" value={form.price_cad} onChange={(e) => {
+                const cad = e.target.value;
+                setForm((prev) => ({ ...prev, price_cad: cad }));
+                if (!usdManuallyEdited) {
+                  const converted = convertCadToUsd(Number(cad));
+                  setForm((prev) => ({ ...prev, price_cad: cad, price_usd: converted !== null ? String(converted) : prev.price_usd }));
+                }
+              }}
                 className={`w-full px-4 py-2.5 border rounded-lg text-sm outline-none ${errors.price_cad ? "border-red-500" : "border-border"}`}
                 min="0" step="0.01" placeholder="0.00" />
               {errors.price_cad && <p className="text-xs text-red-600 mt-1">{errors.price_cad}</p>}
             </div>
             <div>
               <label className="block text-sm font-medium text-foreground mb-2">Price (USD) *</label>
-              <input type="number" value={form.price_usd} onChange={(e) => setForm({ ...form, price_usd: e.target.value })}
+              <input type="number" value={form.price_usd} onChange={(e) => {
+                setUsdManuallyEdited(true);
+                setForm({ ...form, price_usd: e.target.value });
+              }}
                 className={`w-full px-4 py-2.5 border rounded-lg text-sm outline-none ${errors.price_usd ? "border-red-500" : "border-border"}`}
                 min="0" step="0.01" placeholder="0.00" />
               {errors.price_usd && <p className="text-xs text-red-600 mt-1">{errors.price_usd}</p>}
@@ -168,6 +181,28 @@ export default function NewProductPage() {
               <input type="number" value={form.stock_quantity} onChange={(e) => setForm({ ...form, stock_quantity: e.target.value })}
                 className="w-full px-4 py-2.5 border border-border rounded-lg text-sm outline-none" min="0" placeholder="0" />
             </div>
+          </div>
+          {/* Exchange Rate Info */}
+          <div className="mt-3 flex items-center gap-2 text-xs text-foreground/50">
+            {rateLoading ? (
+              <span className="flex items-center gap-1"><RefreshCw className="w-3 h-3 animate-spin" /> Fetching live exchange rate...</span>
+            ) : rate ? (
+              <span>
+                Live rate: 1 CAD = {rate.toFixed(4)} USD
+                {lastUpdated && <span className="ml-2">(updated {lastUpdated.toLocaleTimeString()})</span>}
+                {usdManuallyEdited && (
+                  <button type="button" onClick={() => {
+                    setUsdManuallyEdited(false);
+                    const converted = convertCadToUsd(Number(form.price_cad));
+                    if (converted !== null) setForm((prev) => ({ ...prev, price_usd: String(converted) }));
+                  }} className="ml-2 text-primary hover:underline">
+                    Reset to live rate
+                  </button>
+                )}
+              </span>
+            ) : (
+              <span>Using fallback rate (0.74)</span>
+            )}
           </div>
         </div>
 

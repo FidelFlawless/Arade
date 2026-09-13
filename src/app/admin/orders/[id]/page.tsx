@@ -86,7 +86,11 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
 
   async function updateStatus(newStatus: string) {
     setUpdating(true);
-    await supabase.from("orders").update({ order_status: newStatus }).eq("id", id);
+    await fetch("/api/admin/orders", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, order_status: newStatus }),
+    });
     setOrder((prev) => (prev ? { ...prev, order_status: newStatus } : prev));
     setUpdating(false);
   }

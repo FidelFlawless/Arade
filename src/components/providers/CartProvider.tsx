@@ -6,8 +6,10 @@ import {
   useEffect,
   useState,
   useCallback,
+  useRef,
   ReactNode,
 } from "react";
+import { useAuth } from "@/components/providers/AuthProvider";
 
 export interface CartItem {
   id: string;
@@ -47,6 +49,8 @@ export function useCart() {
 export function CartProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
   const [hydrated, setHydrated] = useState(false);
+  const { user } = useAuth();
+  const trackTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Hydrate from localStorage on mount
   useEffect(() => {
@@ -72,6 +76,35 @@ export function CartProvider({ children }: { children: ReactNode }) {
       localStorage.setItem(CART_KEY, JSON.stringify(items));
     }
   }, [items, hydrated]);
+
+  // Track cart server-side for logged-in users (debounced)
+  useEffect(() => {
+    if (!hydrated || !user) return;
+
+    if (trackTimeoutRef.current) clearTimeout(trackTimeoutRef.current);
+
+    trackTimeoutRef.current = setTimeout(() => {
+      const cartTotal = items.reduce(
+        (sum, item) => sum + item.price_cad * item.quantity,
+        0
+      );
+      fetch("/api/cart/track", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: user.id,
+          email: user.email,
+          items,
+          cartTotal,
+          currency: "CAD",
+        }),
+      }).catch(() => {});
+    }, 2000);
+
+    return () => {
+      if (trackTimeoutRef.current) clearTimeout(trackTimeoutRef.current);
+    };
+  }, [items, hydrated, user]);
 
   const addToCart = useCallback(
     (product: Omit<CartItem, "quantity">, quantity = 1) => {
