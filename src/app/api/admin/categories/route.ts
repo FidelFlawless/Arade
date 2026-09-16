@@ -1,13 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { requireAdminUser } from "@/lib/auth/admin";
 
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
-
-// GET - List all categories
+// GET - List all categories (admin only)
 export async function GET() {
+  // Authorization runs first: the service-role client is only created once the
+  // request has been verified as an authenticated admin.
+  const auth = await requireAdminUser();
+  if (!auth.allowed) return auth.response;
+
+  const supabaseAdmin = createAdminClient();
   const { data, error } = await supabaseAdmin
     .from("categories")
     .select("*")
@@ -16,8 +18,12 @@ export async function GET() {
   return NextResponse.json(data);
 }
 
-// POST - Create category
+// POST - Create category (admin only)
 export async function POST(req: NextRequest) {
+  const auth = await requireAdminUser();
+  if (!auth.allowed) return auth.response;
+
+  const supabaseAdmin = createAdminClient();
   const body = await req.json();
   const { data, error } = await supabaseAdmin
     .from("categories")
@@ -28,8 +34,12 @@ export async function POST(req: NextRequest) {
   return NextResponse.json(data);
 }
 
-// PUT - Update category
+// PUT - Update category (admin only)
 export async function PUT(req: NextRequest) {
+  const auth = await requireAdminUser();
+  if (!auth.allowed) return auth.response;
+
+  const supabaseAdmin = createAdminClient();
   const body = await req.json();
   const { id, ...updates } = body;
   if (!id) return NextResponse.json({ error: "Category ID required" }, { status: 400 });
@@ -43,8 +53,12 @@ export async function PUT(req: NextRequest) {
   return NextResponse.json(data);
 }
 
-// DELETE - Delete category
+// DELETE - Delete category (admin only)
 export async function DELETE(req: NextRequest) {
+  const auth = await requireAdminUser();
+  if (!auth.allowed) return auth.response;
+
+  const supabaseAdmin = createAdminClient();
   const { searchParams } = new URL(req.url);
   const id = searchParams.get("id");
   if (!id) return NextResponse.json({ error: "Category ID required" }, { status: 400 });

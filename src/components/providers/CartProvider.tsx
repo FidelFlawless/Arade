@@ -6,7 +6,6 @@ import {
   useEffect,
   useState,
   useCallback,
-  useRef,
   ReactNode,
 } from "react";
 import { useAuth } from "@/components/providers/AuthProvider";
@@ -50,7 +49,6 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
   const [hydrated, setHydrated] = useState(false);
   const { user } = useAuth();
-  const trackTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Hydrate from localStorage on mount
   useEffect(() => {
@@ -77,17 +75,23 @@ export function CartProvider({ children }: { children: ReactNode }) {
     }
   }, [items, hydrated]);
 
-  // Track cart server-side for logged-in users (debounced)
+  // Track cart server-side for logged-in users
+  // - Immediate track on mount (so revisit updates last_active right away)
+  // - Debounced track on item changes
+  // - Final track on page unload as a safety net
   useEffect(() => {
     if (!hydrated || !user) return;
+    if (items.length === 0) return;
 
-    if (trackTimeoutRef.current) clearTimeout(trackTimeoutRef.current);
+    const cartTotal = items.reduce(
+      (sum, item) => sum + item.price_cad * item.quantity,
+      0
+    );
 
-    trackTimeoutRef.current = setTimeout(() => {
-      const cartTotal = items.reduce(
-        (sum, item) => sum + item.price_cad * item.quantity,
-        0
-      );
+    let cancelled = false;
+
+    const sendTrack = () => {
+      if (cancelled) return;
       fetch("/api/cart/track", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -99,15 +103,41 @@ export function CartProvider({ children }: { children: ReactNode }) {
           currency: "CAD",
         }),
       }).catch((err) => {
-        // Track failures silently in prod, but surface in console for debugging
         if (process.env.NODE_ENV !== "production") {
           console.warn("[CartProvider] Failed to track cart:", err);
         }
       });
-    }, 2000);
+    };
+
+    // 1. Immediate track on mount/revisit
+    sendTrack();
+
+    // 2. Debounced track on item changes
+    const debounceTimer = setTimeout(sendTrack, 500);
+
+    // 3. Final track on page unload (sendBeacon with explicit JSON content type)
+    const handleBeforeUnload = () => {
+      if (cancelled) return;
+      const blob = new Blob(
+        [
+          JSON.stringify({
+            userId: user.id,
+            email: user.email,
+            items,
+            cartTotal,
+            currency: "CAD",
+          }),
+        ],
+        { type: "application/json" }
+      );
+      navigator.sendBeacon?.("/api/cart/track", blob);
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
 
     return () => {
-      if (trackTimeoutRef.current) clearTimeout(trackTimeoutRef.current);
+      cancelled = true;
+      clearTimeout(debounceTimer);
+      window.removeEventListener("beforeunload", handleBeforeUnload);
     };
   }, [items, hydrated, user]);
 

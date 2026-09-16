@@ -1,17 +1,11 @@
-import type { Metadata } from "next";
-import { absoluteUrl, JsonLd } from "@/lib/seo";
+import { absoluteUrl, buildPageMetadata, JsonLd } from "@/lib/seo";
 
-export const metadata: Metadata = {
+export const metadata = buildPageMetadata({
   title: "Collections",
   description: "Explore Arade's curated collections across beauty, skincare, hair and fashion.",
-  alternates: { canonical: absoluteUrl("/collection") },
-  openGraph: {
-    title: "Collections | Arade",
-    description: "Explore Arade's curated collections across beauty, skincare, hair and fashion.",
-    url: absoluteUrl("/collection"),
-    type: "website",
-  },
-};
+  path: "/collection",
+  ogTitle: "Collections | Arade",
+});
 
 const breadcrumbSchema = {
   "@context": "https://schema.org",

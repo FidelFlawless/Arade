@@ -1,11 +1,10 @@
-import type { Metadata } from "next";
-import { absoluteUrl } from "@/lib/seo";
+import { buildPageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
+export const metadata = buildPageMetadata({
   title: "Terms and Conditions",
   description: "Read the terms and conditions that govern your use of the Arade website and purchases.",
-  alternates: { canonical: absoluteUrl("/terms") },
-};
+  path: "/terms",
+});
 
 export default function TermsPage() {
   return (

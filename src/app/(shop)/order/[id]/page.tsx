@@ -12,7 +12,10 @@ interface OrderItem {
   id: string;
   product_id: string;
   product_name: string;
-  product_image: string | null;
+  product_image?: string | null;
+  products?: {
+    images?: string[] | null;
+  } | null;
   quantity: number;
   unit_price: number;
   subtotal: number;
@@ -55,7 +58,7 @@ export default function OrderDetailPage() {
     const load = async () => {
       const { data } = await supabase
         .from("orders")
-        .select("*, order_items(*)")
+        .select("*, order_items(*, products(images))")
         .eq("order_number", orderNumber)
         .eq("user_id", user.id)
         .single();
@@ -68,6 +71,7 @@ export default function OrderDetailPage() {
             .from("reviews")
             .select("product_id")
             .eq("user_id", user.id)
+            .eq("order_id", data.id)
             .in("product_id", productIds);
           if (reviews) setReviewedProducts(new Set(reviews.map((r) => r.product_id)));
         }
@@ -127,16 +131,24 @@ export default function OrderDetailPage() {
       <div className="card mb-6">
         <h2 className="font-semibold mb-4">Order Items</h2>
         <div className="space-y-4">
-          {order.order_items.map((item) => (
-            <div key={item.id} className="border-b border-border pb-4 last:border-0 last:pb-0">
-              <div className="flex gap-3 items-start">
-                {item.product_image && <img src={item.product_image} alt={item.product_name} className="w-14 h-14 object-cover rounded-lg" />}
-                <div className="flex-1">
-                  <p className="font-medium">{item.product_name}</p>
-                  <p className="text-sm text-foreground/50">Qty: {item.quantity} x {fmt(item.unit_price)}</p>
+          {order.order_items.map((item) => {
+            const itemImage = item.product_image || item.products?.images?.[0];
+            return (
+              <div key={item.id} className="border-b border-border pb-4 last:border-0 last:pb-0">
+                <div className="flex gap-3 items-start">
+                  {itemImage ? (
+                    <img src={itemImage} alt={item.product_name} className="w-14 h-14 object-cover rounded-lg shrink-0 border border-border" />
+                  ) : (
+                    <div className="w-14 h-14 bg-muted rounded-lg flex items-center justify-center shrink-0 border border-border">
+                      <Package className="w-6 h-6 text-foreground/30" />
+                    </div>
+                  )}
+                  <div className="flex-1">
+                    <p className="font-medium">{item.product_name}</p>
+                    <p className="text-sm text-foreground/50">Qty: {item.quantity} x {fmt(item.unit_price)}</p>
+                  </div>
+                  <p className="font-medium">{fmt(item.subtotal ?? item.unit_price * item.quantity)}</p>
                 </div>
-                <p className="font-medium">{fmt(item.subtotal ?? item.unit_price * item.quantity)}</p>
-              </div>
               {canReview && !reviewedProducts.has(item.product_id) && (
                 <ReviewForm
                   userId={user.id}
@@ -150,7 +162,8 @@ export default function OrderDetailPage() {
                 <p className="text-xs text-green-600 mt-2 flex items-center gap-1"><CheckCircle className="w-3 h-3" /> Reviewed</p>
               )}
             </div>
-          ))}
+          );
+        })}
         </div>
 
         <div className="border-t border-border mt-4 pt-4 space-y-2">

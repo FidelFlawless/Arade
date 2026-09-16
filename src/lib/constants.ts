@@ -2,7 +2,7 @@
 export const SITE_NAME = "Arade";
 export const SITE_DESCRIPTION =
   "Your destination for beauty, skincare, hair and fashion. Curated products to elevate your everyday routine.";
-export const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://aradeshop.com";
+export const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://www.aradeshop.com";
 
 // Delivery settings
 export const FREE_DELIVERY_THRESHOLD = 180; // Orders $180+ get free delivery

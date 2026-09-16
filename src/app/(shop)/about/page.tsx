@@ -1,19 +1,14 @@
 import { Metadata } from "next";
 import { SITE_NAME } from "@/lib/constants";
 import { Gem, Leaf, Globe } from "lucide-react";
-import { absoluteUrl } from "@/lib/seo";
+import { buildPageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = buildPageMetadata({
   title: "About Arade",
   description: "Learn about Arade, your destination for beauty, skincare, hair and fashion.",
-  alternates: { canonical: absoluteUrl("/about") },
-  openGraph: {
-    title: "About Arade",
-    description: "Learn about Arade, your destination for beauty, skincare, hair and fashion.",
-    url: absoluteUrl("/about"),
-    type: "website",
-  },
-};
+  path: "/about",
+  ogTitle: "About Arade",
+});
 
 export default function AboutPage() {
   return (

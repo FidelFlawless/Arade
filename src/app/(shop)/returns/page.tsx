@@ -1,11 +1,10 @@
-import type { Metadata } from "next";
-import { absoluteUrl } from "@/lib/seo";
+import { buildPageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
+export const metadata = buildPageMetadata({
   title: "Return Policy",
   description: "Learn how to request a return, refund, or exchange for an Arade order.",
-  alternates: { canonical: absoluteUrl("/returns") },
-};
+  path: "/returns",
+});
 
 export default function ReturnPolicyPage() {
   return (

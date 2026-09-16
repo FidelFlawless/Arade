@@ -1,11 +1,10 @@
-import type { Metadata } from "next";
-import { absoluteUrl } from "@/lib/seo";
+import { buildPageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
+export const metadata = buildPageMetadata({
   title: "Privacy Policy",
   description: "Learn how Arade collects, uses, and protects information when you shop with us.",
-  alternates: { canonical: absoluteUrl("/privacy") },
-};
+  path: "/privacy",
+});
 
 export default function PrivacyPolicyPage() {
   return (

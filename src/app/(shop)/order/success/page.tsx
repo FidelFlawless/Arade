@@ -9,6 +9,7 @@ import { useCart } from "@/components/providers/CartProvider";
 function OrderSuccessContent() {
   const searchParams = useSearchParams();
   const sessionId = searchParams.get("session_id");
+  const paypalOrderId = searchParams.get("paypal_order_id");
   const { clearCart } = useCart();
   const [order, setOrder] = useState<{
     order_number: string;
@@ -19,9 +20,10 @@ function OrderSuccessContent() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    if (sessionId) {
-      clearCart();
+    clearCart();
 
+    if (sessionId) {
+      // Stripe flow
       const checkOrder = async () => {
         try {
           const res = await fetch(`/api/checkout/verify?session_id=${sessionId}`);
@@ -45,7 +47,36 @@ function OrderSuccessContent() {
       const timer = setTimeout(checkOrder, 1500);
       return () => clearTimeout(timer);
     }
-  }, [sessionId, clearCart]);
+
+    if (paypalOrderId) {
+      // PayPal flow
+      const checkPayPalOrder = async () => {
+        try {
+          const res = await fetch(`/api/checkout/verify?paypal_order_id=${paypalOrderId}`);
+          const data = await res.json();
+
+          if (data.success && data.order) {
+            setOrder(data.order);
+            setLoading(false);
+          } else if (data.pending) {
+            setTimeout(checkPayPalOrder, 2000);
+          } else {
+            setError(data.error || "Order could not be found");
+            setLoading(false);
+          }
+        } catch {
+          setError("Failed to verify order");
+          setLoading(false);
+        }
+      };
+
+      const timer = setTimeout(checkPayPalOrder, 1500);
+      return () => clearTimeout(timer);
+    }
+
+    // No params — show generic success
+    setLoading(false);
+  }, [sessionId, paypalOrderId, clearCart]);
 
   if (loading) {
     return (

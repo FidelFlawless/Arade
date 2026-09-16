@@ -1,18 +1,25 @@
 import CategoryPage from "@/app/(shop)/category/CategoryPage";
 import type { Metadata } from "next";
-import { absoluteUrl, getActiveCategory, JsonLd, truncateDescription } from "@/lib/seo";
+import { absoluteUrl, buildPageMetadata, countActiveCategoryProducts, getActiveCategory, JsonLd, truncateDescription } from "@/lib/seo";
 
 const fallbackDescription = "Discover beauty essentials curated for your everyday routine, from makeup and fragrances to beauty tools.";
 
 export async function generateMetadata(): Promise<Metadata> {
-  const category = await getActiveCategory("beauty");
+  const [category, productCount] = await Promise.all([
+    getActiveCategory("beauty"),
+    countActiveCategoryProducts("beauty"),
+  ]);
   const description = truncateDescription(category?.description, fallbackDescription);
-  return {
+  // Empty parent categories stay crawlable (follow) but are excluded from the
+  // index until products exist; the page becomes indexable automatically as
+  // soon as the category has active products.
+  return buildPageMetadata({
     title: "Beauty Products",
     description,
-    alternates: { canonical: absoluteUrl("/beauty") },
-    openGraph: { title: "Beauty Products | Arade", description, url: absoluteUrl("/beauty"), type: "website" },
-  };
+    path: "/beauty",
+    ogTitle: "Beauty Products | Arade",
+    index: productCount > 0,
+  });
 }
 
 export default async function BeautyPage() {

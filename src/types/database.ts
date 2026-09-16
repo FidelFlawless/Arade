@@ -144,8 +144,11 @@ export interface Product {
   ingredients: string | null;
   benefits: string | null;
   how_to_use: string | null;
-  skin_types: string[];
+  skin_type: string | null;
   size: string | null;
+  brand: string | null;
+  sku: string | null;
+  image_url: string | null;
   is_active: boolean;
   is_featured: boolean;
   average_rating: number;
@@ -168,8 +171,11 @@ export interface ProductInsert {
   ingredients?: string | null;
   benefits?: string | null;
   how_to_use?: string | null;
-  skin_types?: string[];
+  skin_type?: string | null;
   size?: string | null;
+  brand?: string | null;
+  sku?: string | null;
+  image_url?: string | null;
   is_active?: boolean;
   is_featured?: boolean;
   average_rating?: number;
@@ -191,8 +197,11 @@ export interface ProductUpdate {
   ingredients?: string | null;
   benefits?: string | null;
   how_to_use?: string | null;
-  skin_types?: string[];
+  skin_type?: string | null;
   size?: string | null;
+  brand?: string | null;
+  sku?: string | null;
+  image_url?: string | null;
   is_active?: boolean;
   is_featured?: boolean;
   average_rating?: number;

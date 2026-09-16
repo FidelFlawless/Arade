@@ -1,17 +1,11 @@
-import type { Metadata } from "next";
-import { absoluteUrl, JsonLd } from "@/lib/seo";
+import { absoluteUrl, buildPageMetadata, JsonLd } from "@/lib/seo";
 
-export const metadata: Metadata = {
+export const metadata = buildPageMetadata({
   title: "Contact Arade",
   description: "Contact Arade for help with products, orders, shipping and customer support.",
-  alternates: { canonical: absoluteUrl("/contact") },
-  openGraph: {
-    title: "Contact Arade | Customer Support",
-    description: "Contact Arade for help with products, orders, shipping and customer support.",
-    url: absoluteUrl("/contact"),
-    type: "website",
-  },
-};
+  path: "/contact",
+  ogTitle: "Contact Arade | Customer Support",
+});
 
 // Uses only the real contact details already shown on the /contact page
 // (defaults mirrored from src/app/(shop)/contact/page.tsx).

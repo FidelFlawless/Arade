@@ -1,18 +1,25 @@
 import CategoryPage from "@/app/(shop)/category/CategoryPage";
 import type { Metadata } from "next";
-import { absoluteUrl, getActiveCategory, JsonLd, truncateDescription } from "@/lib/seo";
+import { absoluteUrl, buildPageMetadata, countActiveCategoryProducts, getActiveCategory, JsonLd, truncateDescription } from "@/lib/seo";
 
 const fallbackDescription = "Shop carefully selected skincare products for healthy, radiant skin, including cleansers, moisturizers and skincare sets.";
 
 export async function generateMetadata(): Promise<Metadata> {
-  const category = await getActiveCategory("skincare");
+  const [category, productCount] = await Promise.all([
+    getActiveCategory("skincare"),
+    countActiveCategoryProducts("skincare"),
+  ]);
   const description = truncateDescription(category?.description, fallbackDescription);
-  return {
+  // Empty parent categories stay crawlable (follow) but are excluded from the
+  // index until products exist; the page becomes indexable automatically as
+  // soon as the category has active products.
+  return buildPageMetadata({
     title: "Skincare Products",
     description,
-    alternates: { canonical: absoluteUrl("/skincare") },
-    openGraph: { title: "Skincare Products | Arade", description, url: absoluteUrl("/skincare"), type: "website" },
-  };
+    path: "/skincare",
+    ogTitle: "Skincare Products | Arade",
+    index: productCount > 0,
+  });
 }
 
 export default async function SkincarePage() {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Lock, Loader2, CreditCard, ShoppingBag } from "lucide-react";
@@ -35,7 +35,18 @@ interface SavedAddress {
   country?: string;
 }
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
+declare global {
+  interface Window {
+    paypal?: any;
+  }
+}
+/* eslint-enable @typescript-eslint/no-explicit-any */
+
+const PAYPAL_CLIENT_ID = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID || "";
+
 export default function CheckoutPage() {
+  const [checkoutStep, setCheckoutStep] = useState<"shipping" | "payment">("shipping");
   const [form, setForm] = useState<ShippingForm>({
     first_name: "",
     last_name: "",
@@ -56,6 +67,11 @@ export default function CheckoutPage() {
   const [, setSavedAddresses] = useState<SavedAddress[]>([]);
   const [, setLoadingAddresses] = useState(true);
   const [errors, setErrors] = useState<Partial<Record<keyof ShippingForm, string>>>({});
+  const [paymentMethod, setPaymentMethod] = useState<"stripe" | "paypal">("stripe");
+  const paypalButtonsRef = useRef<HTMLDivElement>(null);
+  const paypalButtonsRendered = useRef(false);
+  const [paypalLoaded, setPaypalLoaded] = useState(false);
+  const [paypalScriptLoaded, setPaypalScriptLoaded] = useState(false);
 
   useEffect(() => { if (!authLoading && !user) router.push("/auth/login?redirect=/checkout"); }, [user, authLoading, router]);
 
@@ -107,7 +123,7 @@ export default function CheckoutPage() {
 
   const provinces = form.country === "CA" ? CANADIAN_PROVINCES : US_STATES;
 
-  const validateForm = (): boolean => {
+  const validateForm = (): Partial<Record<keyof ShippingForm, string>> => {
     const newErrors: Partial<Record<keyof ShippingForm, string>> = {};
 
     if (!form.first_name.trim()) newErrors.first_name = "First name is required";
@@ -125,34 +141,58 @@ export default function CheckoutPage() {
     }
 
     setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    return newErrors;
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!validateForm()) return;
+  const isFormValid = (errs: Partial<Record<keyof ShippingForm, string>>) =>
+    Object.keys(errs).length === 0;
+
+  const buildShippingAddress = () => ({
+    first_name: form.first_name,
+    last_name: form.last_name,
+    email: form.email,
+    phone: form.phone,
+    address_line1: form.address_line1,
+    address_line2: form.address_line2,
+    city: form.city,
+    province_state: form.province_state,
+    postal_code: form.postal_code,
+  });
+
+  const buildItems = () =>
+    cartItems.map((item) => ({
+      productId: item.id,
+      quantity: item.quantity,
+    }));
+
+  // ─── Step 1 -> Step 2: Validate shipping and continue to payment ──
+  const handleContinueToPayment = () => {
+    const errs = validateForm();
+    if (isFormValid(errs)) {
+      setCheckoutStep("payment");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } else {
+      // Scroll to the first field with an error
+      const errorFields: (keyof ShippingForm)[] = ["phone", "email", "first_name", "last_name", "address_line1", "city", "province_state", "postal_code"];
+      for (const field of errorFields) {
+        if (errs[field]) {
+          const el = document.getElementById(`checkout-${field}`);
+          if (el) {
+            el.scrollIntoView({ behavior: "smooth", block: "center" });
+            el.focus();
+          }
+          break;
+        }
+      }
+    }
+  };
+
+  // ─── Stripe checkout ─────────────────────────────────────────
+  const handleStripeCheckout = useCallback(async () => {
     if (!user) return;
 
     setLoading(true);
     try {
-      const shippingAddress = {
-        first_name: form.first_name,
-        last_name: form.last_name,
-        email: form.email,
-        phone: form.phone,
-        address_line1: form.address_line1,
-        address_line2: form.address_line2,
-        city: form.city,
-        province_state: form.province_state,
-        postal_code: form.postal_code,
-      };
-
-      const items = cartItems.map((item) => ({
-        productId: item.id,
-        quantity: item.quantity,
-      }));
-
-      // Get the user's session token for auth header
       const { data: sessionData } = await supabase.auth.getSession();
       const token = sessionData?.session?.access_token || undefined;
 
@@ -164,8 +204,8 @@ export default function CheckoutPage() {
         },
         body: JSON.stringify({
           userId: user.id,
-          items,
-          shippingAddress,
+          items: buildItems(),
+          shippingAddress: buildShippingAddress(),
           country: form.country,
           currency,
         }),
@@ -174,7 +214,6 @@ export default function CheckoutPage() {
       const data = await res.json();
 
       if (data.success && data.url) {
-        // Redirect to Stripe Checkout
         window.location.href = data.url;
       } else {
         alert(data.details ? `${data.error}: ${data.details}` : data.error || "Failed to start checkout. Please try again.");
@@ -184,7 +223,168 @@ export default function CheckoutPage() {
       alert("An error occurred. Please try again.");
       setLoading(false);
     }
-  };
+  }, [user, form, currency, cartItems, supabase]);
+
+  // ─── PayPal checkout ─────────────────────────────────────────
+  const handleCreatePayPalOrder = useCallback(async () => {
+    const errs = validateForm(); if (!isFormValid(errs)) throw new Error("validation_failed");
+    if (!user) throw new Error("not_authenticated");
+
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData?.session?.access_token || undefined;
+
+    const res = await fetch("/api/checkout/paypal", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({
+        userId: user.id,
+        items: buildItems(),
+        shippingAddress: buildShippingAddress(),
+        country: form.country,
+        currency,
+      }),
+    });
+
+    const data = await res.json();
+
+    if (!data.success || !data.paypalOrderId) {
+      throw new Error(data.details || data.error || "Failed to create PayPal order");
+    }
+
+    // Store order info for success page
+    sessionStorage.setItem("paypal_order_id", data.paypalOrderId);
+    sessionStorage.setItem("paypal_order_number", data.orderNumber);
+
+    return data.paypalOrderId;
+  }, [user, form, currency, cartItems, supabase]);
+
+  const handlePayPalApprove = useCallback(async (data: { orderID: string }) => {
+    const res = await fetch("/api/checkout/paypal/capture", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ paypalOrderId: data.orderID }),
+    });
+
+    const result = await res.json();
+
+    if (result.success) {
+      // Clear session storage items used for PayPal
+      sessionStorage.removeItem("paypal_order_id");
+      sessionStorage.removeItem("paypal_order_number");
+
+      if (result.alreadyCaptured) {
+        // Already captured, just go to success
+        const orderNumber = sessionStorage.getItem("paypal_order_number");
+        window.location.href = `/order/success?paypal_order_id=${data.orderID}`;
+      } else {
+        window.location.href = `/order/success?paypal_order_id=${data.orderID}`;
+      }
+    } else {
+      throw new Error(result.error || "Payment capture failed");
+    }
+  }, []);
+
+  // Load PayPal SDK when PayPal is selected
+  useEffect(() => {
+    if (paymentMethod !== "paypal" || !PAYPAL_CLIENT_ID) return;
+
+    if (window.paypal) {
+      setPaypalScriptLoaded(true);
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.src = `https://www.paypal.com/sdk/js?client-id=${PAYPAL_CLIENT_ID}&currency=${currency}`;
+    script.async = true;
+    script.onload = () => {
+      setPaypalScriptLoaded(true);
+    };
+    script.onerror = () => {
+      console.error("Failed to load PayPal SDK");
+    };
+    document.body.appendChild(script);
+
+    return () => {
+      // Don't remove the script on unmount — PayPal SDK is global
+    };
+  }, [paymentMethod, currency]);
+
+  // Render PayPal buttons when SDK is loaded and PayPal is selected
+  useEffect(() => {
+    if (
+      paymentMethod !== "paypal" ||
+      !paypalScriptLoaded ||
+      !window.paypal ||
+      !paypalButtonsRef.current ||
+      paypalButtonsRendered.current
+    ) {
+      return;
+    }
+
+    paypalButtonsRendered.current = true;
+    setPaypalLoaded(true);
+
+    window.paypal.Buttons({
+      style: {
+        layout: "vertical",
+        color: "gold",
+        shape: "rect",
+        label: "pay",
+        height: 48,
+      },
+      createOrder: async () => {
+        try {
+          setLoading(true);
+          const orderId = await handleCreatePayPalOrder();
+          setLoading(false);
+          return orderId;
+        } catch (err: unknown) {
+          setLoading(false);
+          console.error("PayPal createOrder error:", err);
+          const msg = err instanceof Error ? err.message : "Unknown error";
+          if (msg === "validation_failed") {
+            alert("Please fill in all required shipping fields.");
+            return;
+          }
+          alert("Failed to start PayPal checkout: " + msg);
+          throw err;
+        }
+      },
+      onApprove: async (data: { orderID: string }) => {
+        try {
+          setLoading(true);
+          await handlePayPalApprove(data);
+        } catch (err) {
+          setLoading(false);
+          console.error("PayPal capture error:", err);
+          alert("Payment failed. Please try again.");
+        }
+      },
+      onError: (err: unknown) => {
+        setLoading(false);
+        console.error("PayPal SDK error:", err);
+        const msg = err && typeof err === "object" && "message" in err ? String((err as { message: unknown }).message) : String(err);
+        alert("PayPal error: " + msg);
+      },
+      onCancel: () => {
+        setLoading(false);
+      },
+    }).render(paypalButtonsRef.current);
+  }, [paymentMethod, paypalScriptLoaded, handleCreatePayPalOrder, handlePayPalApprove]);
+
+  // Reset PayPal buttons when payment method changes
+  useEffect(() => {
+    if (paymentMethod !== "paypal") {
+      paypalButtonsRendered.current = false;
+      setPaypalLoaded(false);
+      if (paypalButtonsRef.current) {
+        paypalButtonsRef.current.innerHTML = "";
+      }
+    }
+  }, [paymentMethod]);
 
   const updateForm = (field: keyof ShippingForm, value: string) => {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -202,9 +402,23 @@ export default function CheckoutPage() {
       <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-foreground mb-6 sm:mb-8">Checkout</h1>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Shipping form */}
+        {/* Shipping form + Payment */}
         <div className="lg:col-span-2">
-          <form onSubmit={handleSubmit}>
+          {/* Step indicator */}
+          <div className="flex items-center gap-3 mb-6">
+            <div className={`flex items-center gap-2 ${checkoutStep === "shipping" ? "text-primary font-semibold" : "text-foreground/50"}`}>
+              <span className={`w-7 h-7 rounded-full flex items-center justify-center text-sm ${checkoutStep === "shipping" ? "bg-primary text-white" : "bg-primary/10 text-primary"}`}>1</span>
+              <span className="text-sm">Shipping</span>
+            </div>
+            <div className="flex-1 h-px bg-border" />
+            <div className={`flex items-center gap-2 ${checkoutStep === "payment" ? "text-primary font-semibold" : "text-foreground/50"}`}>
+              <span className={`w-7 h-7 rounded-full flex items-center justify-center text-sm ${checkoutStep === "payment" ? "bg-primary text-white" : "bg-border text-foreground/40"}`}>2</span>
+              <span className="text-sm">Payment</span>
+            </div>
+          </div>
+
+          {/* ═══ STEP 1: Shipping ═══ */}
+          {checkoutStep === "shipping" && (
             <div className="card mb-6">
               <h2 className="text-lg font-semibold text-foreground mb-6">
                 Shipping Information
@@ -240,6 +454,7 @@ export default function CheckoutPage() {
                       onChange={(e) => updateForm("first_name", e.target.value)}
                       className={`input ${errors.first_name ? "input-error" : ""}`}
                       placeholder="John"
+                      id="checkout-first_name"
                     />
                     {errors.first_name && (
                       <p className="text-xs text-red-600 mt-1">{errors.first_name}</p>
@@ -255,6 +470,7 @@ export default function CheckoutPage() {
                       onChange={(e) => updateForm("last_name", e.target.value)}
                       className={`input ${errors.last_name ? "input-error" : ""}`}
                       placeholder="Doe"
+                      id="checkout-last_name"
                     />
                     {errors.last_name && (
                       <p className="text-xs text-red-600 mt-1">{errors.last_name}</p>
@@ -268,12 +484,14 @@ export default function CheckoutPage() {
                     <label className="block text-sm font-medium text-foreground mb-2">
                       Email *
                     </label>
-                    <input                       type="email"
-                       suppressHydrationWarning
+                    <input
+                      type="email"
+                      suppressHydrationWarning
                       value={form.email}
                       onChange={(e) => updateForm("email", e.target.value)}
                       className={`input ${errors.email ? "input-error" : ""}`}
                       placeholder="john@example.com"
+                      id="checkout-email"
                     />
                     {errors.email && (
                       <p className="text-xs text-red-600 mt-1">{errors.email}</p>
@@ -289,6 +507,7 @@ export default function CheckoutPage() {
                       onChange={(e) => updateForm("phone", e.target.value)}
                       className={`input ${errors.phone ? "border-red-500" : ""}`}
                       placeholder="+1 (555) 123-4567"
+                      id="checkout-phone"
                     />
                     {errors.phone && <p className="text-xs text-red-600 mt-1">{errors.phone}</p>}
                   </div>
@@ -303,12 +522,12 @@ export default function CheckoutPage() {
                     type="text"
                     value={form.address_line1}
                     onChange={(e) => updateForm("address_line1", e.target.value)}
-                    className={`input ${errors.address_line1 ? "input-error" : ""}`}
-                    placeholder="123 Main Street"
-                  />
-                  {errors.address_line1 && (
-                    <p className="text-xs text-red-600 mt-1">{errors.address_line1}</p>
-                  )}
+                    className={`input ${errors.address_line1 ? "input-error" : ""}`}                      placeholder="123 Main Street"
+                      id="checkout-address_line1"
+                    />
+                    {errors.address_line1 && (
+                      <p className="text-xs text-red-600 mt-1">{errors.address_line1}</p>
+                    )}
                 </div>
 
                 <div>
@@ -336,6 +555,7 @@ export default function CheckoutPage() {
                       onChange={(e) => updateForm("city", e.target.value)}
                       className={`input ${errors.city ? "input-error" : ""}`}
                       placeholder="Toronto"
+                      id="checkout-city"
                     />
                     {errors.city && (
                       <p className="text-xs text-red-600 mt-1">{errors.city}</p>
@@ -349,6 +569,7 @@ export default function CheckoutPage() {
                       value={form.province_state}
                       onChange={(e) => updateForm("province_state", e.target.value)}
                       className={`input ${errors.province_state ? "input-error" : ""}`}
+                      id="checkout-province_state"
                     >
                       <option value="">Select...</option>
                       {provinces.map((p) => (
@@ -371,6 +592,7 @@ export default function CheckoutPage() {
                       onChange={(e) => updateForm("postal_code", e.target.value)}
                       className={`input ${errors.postal_code ? "input-error" : ""}`}
                       placeholder={form.country === "CA" ? "A1A 1A1" : "12345"}
+                      id="checkout-postal_code"
                     />
                     {errors.postal_code && (
                       <p className="text-xs text-red-600 mt-1">{errors.postal_code}</p>
@@ -378,27 +600,134 @@ export default function CheckoutPage() {
                   </div>
                 </div>
               </div>
-            </div>
 
-            {/* Place order button - mobile */}
-            <button
-              type="submit"
-              disabled={loading}
-              className="lg:hidden btn-primary w-full flex items-center justify-center gap-2 mb-6"
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                  Processing...
-                </>
-              ) : (
-                <>
-                  <Lock className="w-5 h-5" />
-                  Place Order - {formatPrice(total, currency)}
-                </>
+              {/* Continue to Payment button */}
+              <button
+                type="button"
+                onClick={handleContinueToPayment}
+                className="btn-primary w-full flex items-center justify-center gap-2 mt-6"
+              >
+                Continue to Payment
+              </button>
+            </div>
+          )}
+
+          {/* ═══ STEP 2: Payment ═══ */}
+          {checkoutStep === "payment" && (
+            <>
+              {/* Edit Shipping (collapsed summary) */}
+              <div className="card mb-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="font-medium text-foreground">Shipping to</h3>
+                    <p className="text-sm text-foreground/60">
+                      {form.first_name} {form.last_name}, {form.address_line1}, {form.city}, {form.province_state} {form.postal_code}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setCheckoutStep("shipping")}
+                    className="text-sm text-primary hover:underline font-medium"
+                  >
+                    Edit
+                  </button>
+                </div>
+              </div>
+
+              {/* Payment Method Selection */}
+              <div className="card mb-6">
+              <h2 className="text-lg font-semibold text-foreground mb-6">
+                Payment Method
+              </h2>
+
+              <div className="space-y-3">
+                {/* Stripe option */}
+                <label
+                  className={`flex items-center gap-3 p-4 border-2 rounded-lg cursor-pointer transition-colors ${
+                    paymentMethod === "stripe"
+                      ? "border-primary bg-primary/5"
+                      : "border-border hover:border-foreground/20"
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="paymentMethod"
+                    value="stripe"
+                    checked={paymentMethod === "stripe"}
+                    onChange={() => setPaymentMethod("stripe")}
+                    className="w-4 h-4 text-primary"
+                  />
+                  <CreditCard className="w-5 h-5 text-foreground/60" />
+                  <div>
+                    <p className="font-medium text-foreground">Credit / Debit Card</p>
+                    <p className="text-xs text-foreground/50">Pay securely with Stripe</p>
+                  </div>
+                </label>
+
+                {/* PayPal option */}
+                <label
+                  className={`flex items-center gap-3 p-4 border-2 rounded-lg cursor-pointer transition-colors ${
+                    paymentMethod === "paypal"
+                      ? "border-primary bg-primary/5"
+                      : "border-border hover:border-foreground/20"
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="paymentMethod"
+                    value="paypal"
+                    checked={paymentMethod === "paypal"}
+                    onChange={() => setPaymentMethod("paypal")}
+                    className="w-4 h-4 text-primary"
+                  />
+                  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none">
+                    <path d="M7.076 21.337H2.47a.641.641 0 0 1-.633-.74L4.944 2.471a.77.77 0 0 1 .757-.642h6.317c2.094 0 3.578.522 4.406 1.55.381.475.628.993.735 1.539.113.565.052 1.234-.18 1.995l-.012.04v.024c-.48 1.917-1.587 3.446-3.297 4.524-.86.544-1.86.845-2.973.891H8.78a.77.77 0 0 0-.759.644l-.008.052-.382 2.418-.096.61a.641.641 0 0 1-.464.422z" fill="#253B80"/>
+                    <path d="M19.868 7.162c-.023.152-.05.305-.08.458l-1.617 10.237-.07.39c-.008.044-.03.082-.064.107a.14.14 0 0 1-.09.036H12.83a.77.77 0 0 0-.76.643l-.005.052-.644 4.084-.027.174a.641.641 0 0 0 .631.742h4.606a.77.77 0 0 0 .758-.644l2.58-16.358a.462.462 0 0 0-.047-.378.463.463 0 0 0-.378-.145z" fill="#179BD7"/>
+                    <path d="M8.942 7.584a.77.77 0 0 0-.758-.644H3.595a.64.64 0 0 0-.631.526L.05 19.065a.14.14 0 0 0 .138.17h4.437l1.393-8.815.024-.153a.77.77 0 0 1 .759-.644h2.334c1.858 0 3.282-.377 4.124-1.262.45-.47.758-1.08.908-1.793.145-.692.108-1.345-.104-1.884a2.41 2.41 0 0 0-.713-.905 3.66 3.66 0 0 0-1.123-.569 6.65 6.65 0 0 0-1.335-.194H8.942z" fill="#253B80"/>
+                  </svg>
+                  <div>
+                    <p className="font-medium text-foreground">PayPal</p>
+                    <p className="text-xs text-foreground/50">Pay with your PayPal account</p>
+                  </div>
+                </label>
+              </div>
+
+              {/* Stripe: Place Order button (mobile) */}
+              {paymentMethod === "stripe" && (
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="lg:hidden btn-primary w-full flex items-center justify-center gap-2 mt-6"
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                      Processing...
+                    </>
+                  ) : (
+                    <>
+                      <Lock className="w-5 h-5" />
+                      Place Order - {formatPrice(total, currency)}
+                    </>
+                  )}
+                </button>
               )}
-            </button>
-          </form>
+
+              {/* PayPal: render buttons */}
+              {paymentMethod === "paypal" && (
+                <div className="mt-6">
+                  {!paypalScriptLoaded && (
+                    <div className="flex items-center justify-center gap-2 py-4 text-foreground/50 text-sm">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Loading PayPal...
+                    </div>
+                  )}
+                  <div ref={paypalButtonsRef} />
+                </div>
+              )}
+            </div>
+            </>
+          )}
         </div>
 
         {/* Order summary */}
@@ -459,24 +788,26 @@ export default function CheckoutPage() {
               </div>
             </div>
 
-            {/* Place order button - desktop */}
-            <button
-              onClick={handleSubmit}
-              disabled={loading}
-              className="hidden lg:flex btn-primary w-full items-center justify-center gap-2"
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                  Processing...
-                </>
-              ) : (
-                <>
-                  <Lock className="w-5 h-5" />
-                  Place Order
-                </>
-              )}
-            </button>
+            {/* Stripe: Place order button (desktop) */}
+            {paymentMethod === "stripe" && (
+              <button
+                onClick={handleStripeCheckout}
+                disabled={loading}
+                className="hidden lg:flex btn-primary w-full items-center justify-center gap-2"
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    Processing...
+                  </>
+                ) : (
+                  <>
+                    <Lock className="w-5 h-5" />
+                    Place Order
+                  </>
+                )}
+              </button>
+            )}
 
             {/* Trust badges */}
             <div className="mt-6 pt-4 border-t border-border space-y-2">
@@ -486,7 +817,7 @@ export default function CheckoutPage() {
               </div>
               <div className="flex items-center gap-2 text-xs text-foreground/50">
                 <CreditCard className="w-4 h-4" />
-                <span>Secure Payment via Stripe</span>
+                <span>Secure Payment via Stripe &amp; PayPal</span>
               </div>
             </div>
           </div>

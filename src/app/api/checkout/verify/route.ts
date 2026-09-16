@@ -9,19 +9,43 @@ const supabaseAdmin = createClient(
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const sessionId = searchParams.get("session_id");
+  const paypalOrderId = searchParams.get("paypal_order_id");
 
-  if (!sessionId) {
-    return NextResponse.json({ error: "No session ID" }, { status: 400 });
+  if (!sessionId && !paypalOrderId) {
+    return NextResponse.json({ error: "No session or order ID" }, { status: 400 });
   }
 
-  // Find order by Stripe session ID
-  const { data: order, error } = await supabaseAdmin
-    .from("orders")
-    .select("id, order_number, total, currency, payment_status")
-    .eq("stripe_session_id", sessionId)
-    .single();
+  let order = null;
 
-  if (error || !order) {
+  if (sessionId) {
+    // Stripe flow — find by Stripe session ID
+    const { data, error } = await supabaseAdmin
+      .from("orders")
+      .select("id, order_number, total, currency, payment_status")
+      .eq("stripe_session_id", sessionId)
+      .single();
+
+    if (error || !data) {
+      return NextResponse.json({ pending: true });
+    }
+    order = data;
+  }
+
+  if (paypalOrderId && !order) {
+    // PayPal flow — find by PayPal order ID stored in stripe_session_id
+    const { data, error } = await supabaseAdmin
+      .from("orders")
+      .select("id, order_number, total, currency, payment_status")
+      .eq("stripe_session_id", `paypal:${paypalOrderId}`)
+      .single();
+
+    if (error || !data) {
+      return NextResponse.json({ pending: true });
+    }
+    order = data;
+  }
+
+  if (!order) {
     return NextResponse.json({ pending: true });
   }
 
@@ -29,6 +53,6 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ success: true, order });
   }
 
-  // Still pending — webhook may not have fired yet
+  // Still pending — capture may not have fired yet
   return NextResponse.json({ pending: true });
 }

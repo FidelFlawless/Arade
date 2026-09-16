@@ -20,12 +20,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const [{ data: categories }, { data: products }] = await Promise.all([
     supabase
       .from("categories")
-      .select("slug, updated_at")
-      .is("parent_category_id", null)
+      .select("id, slug, parent_category_id, updated_at")
       .eq("is_active", true),
     supabase
       .from("products")
-      .select("slug, updated_at")
+      .select("slug, category_id, updated_at")
       .eq("is_active", true),
   ]);
 
@@ -35,12 +34,33 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: page.priority,
   }));
 
-  const categoryPages = (categories || []).map((category) => ({
-    url: absoluteUrl(`/${category.slug}`),
-    lastModified: category.updated_at,
-    changeFrequency: "weekly" as const,
-    priority: 0.8,
-  }));
+  // Only list top-level categories that actually contain active products
+  // (directly or in a subcategory). Empty parents are noindex, so they must
+  // not be advertised in the sitemap; they reappear automatically once a
+  // product is assigned to their tree.
+  const categoryById = new Map((categories || []).map((c) => [c.id, c]));
+  const parentsWithProducts = new Set<string>();
+  for (const product of products || []) {
+    let current = categoryById.get(product.category_id);
+    const seen = new Set<string>();
+    while (current && !seen.has(current.id)) {
+      seen.add(current.id);
+      if (!current.parent_category_id) {
+        parentsWithProducts.add(current.id);
+        break;
+      }
+      current = categoryById.get(current.parent_category_id);
+    }
+  }
+
+  const categoryPages = (categories || [])
+    .filter((c) => !c.parent_category_id && parentsWithProducts.has(c.id))
+    .map((category) => ({
+      url: absoluteUrl(`/${category.slug}`),
+      lastModified: category.updated_at,
+      changeFrequency: "weekly" as const,
+      priority: 0.8,
+    }));
 
   const productPages = (products || []).map((product) => ({
     url: absoluteUrl(`/product/${product.slug}`),

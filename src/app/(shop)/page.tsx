@@ -1,24 +1,18 @@
 import Link from "next/link";
-import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import { Leaf, Droplets, Rabbit, ShieldCheck } from "lucide-react";
 import NewsletterForm from "@/components/newsletter/NewsletterForm";
 import CategorySection from "@/components/home/CategorySection";
 import ProductCard from "@/components/product/ProductCard";
-import { absoluteUrl, JsonLd } from "@/lib/seo";
+import { absoluteUrl, buildPageMetadata, JsonLd } from "@/lib/seo";
 
-export const metadata: Metadata = {
+export const metadata = buildPageMetadata({
   title: "Beauty, Skincare, Hair & Fashion",
-  description: "Shop thoughtfully curated beauty, skincare, hair and fashion essentials at Arade, serving customers across Canada and the United States.",
-  alternates: { canonical: absoluteUrl("/") },
-  openGraph: {
-    title: "Beauty, Skincare, Hair & Fashion | Arade",
-    description: "Shop thoughtfully curated beauty, skincare, hair and fashion essentials at Arade.",
-    url: absoluteUrl("/"),
-    type: "website",
-    images: [{ url: absoluteUrl("/og-image.webp"), alt: "Arade beauty and fashion products" }],
-  },
-};
+  description:
+    "Shop thoughtfully curated beauty, skincare, hair and fashion essentials at Arade, serving customers across Canada and the United States.",
+  path: "/",
+  ogTitle: "Beauty, Skincare, Hair & Fashion | Arade",
+});
 
 export default async function HomePage() {
   const supabase = await createClient();

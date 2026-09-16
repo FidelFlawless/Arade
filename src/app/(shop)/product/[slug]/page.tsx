@@ -3,12 +3,42 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Image from "next/image";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { Check, X } from "lucide-react";
 import AddToCartButton from "@/components/product/AddToCartButton";
 import ProductImageGallery from "@/components/product/ProductImageGallery";
-import { absoluteUrl, DEFAULT_OG_IMAGE, JsonLd, truncateDescription } from "@/lib/seo";
+import ReviewForm from "@/components/product/ReviewForm";
+import { absoluteUrl, DEFAULT_OG_IMAGE, JsonLd } from "@/lib/seo";
 
-const productFallbackDescription = "Shop this curated Arade beauty, skincare, hair or fashion product.";
+/** Collapse whitespace and trim; returns "" for null/undefined values. */
+function cleanText(value: string | null | undefined) {
+  return (value || "").replace(/\s+/g, " ").trim();
+}
+
+/** Truncate to a max length at a word boundary, appending an ellipsis. */
+function truncateAtWord(text: string, maxLength: number) {
+  if (text.length <= maxLength) return text;
+  const cut = text.slice(0, maxLength - 1);
+  const lastSpace = cut.lastIndexOf(" ");
+  return `${(lastSpace > 40 ? cut.slice(0, lastSpace) : cut).trimEnd()}…`;
+}
+
+/**
+ * Natural meta description built only from real product fields (name, brand,
+ * description, category). No keyword stuffing, no invented claims.
+ */
+function buildProductMetaDescription(
+  product: { name: string; brand: string | null; description: string | null },
+  categoryName: string
+) {
+  const brand = cleanText(product.brand);
+  const body = cleanText(product.description);
+  const summary = body || `${brand ? `${brand} ` : ""}${product.name}, available at Arade.`;
+  const text = brand
+    ? `${brand} - ${summary} Shop ${categoryName} at Arade.`
+    : `${summary} Shop ${categoryName} at Arade.`;
+  return truncateAtWord(text, 160);
+}
 
 async function getProduct(slug: string) {
   const supabase = await createClient();
@@ -27,7 +57,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   if (!product) return { title: "Product Not Found", robots: { index: false, follow: false } };
 
   const categoryName = product.categories?.name || "Products";
-  const description = truncateDescription(product.description, productFallbackDescription);
+  const description = buildProductMetaDescription(product, categoryName);
   const productImage = product.images?.[0];
   const socialImage = productImage ? (productImage.startsWith("http") ? productImage : absoluteUrl(productImage)) : absoluteUrl(DEFAULT_OG_IMAGE);
 
@@ -91,13 +121,14 @@ export default async function ProductPage({
   let avgRating = 0;
   let reviewCount = 0;
   if (product) {
-    const { data: revs } = await supabase
+    const adminSupabase = createAdminClient();
+    const { data: revs } = await adminSupabase
       .from("reviews")
-      .select("*, profiles(full_name)")
+      .select("id, rating, comment, is_verified, created_at, profiles(full_name)")
       .eq("product_id", product.id)
       .eq("is_approved", true)
       .order("created_at", { ascending: false });
-    approvedReviews = (revs as ProductReviewRow[]) || [];
+    approvedReviews = (revs as unknown as ProductReviewRow[]) || [];
     reviewCount = approvedReviews.length;
     if (reviewCount > 0) {
       avgRating = Math.round((approvedReviews.reduce((sum, r) => sum + r.rating, 0) / reviewCount) * 10) / 10;
@@ -125,15 +156,21 @@ export default async function ProductPage({
   const parentSlug = parentCategory?.slug || categorySlug;
   const parentName = parentCategory?.name || categoryName;
   const isSubcategory = !!parentCategory;
+  const brandName = cleanText(product.brand);
+  const productSku = cleanText(product.sku);
+  // Structured-data description: the full factual product description from the
+  // database (not the shorter meta-description cut), with a safe factual
+  // fallback built from real fields only - never fabricated claims.
+  const jsonLdDescription =
+    cleanText(product.description) ||
+    `${brandName ? `${brandName} ` : ""}${product.name}, available at Arade.`;
   const productSchema: Record<string, unknown> = {
     "@context": "https://schema.org",
     "@type": "Product",
     name: product.name,
-    // Safe SEO fallback based only on real product info — never fabricated.
-    description: truncateDescription(product.description, productFallbackDescription),
+    description: jsonLdDescription,
     image: (product.images || []).map((image: string) => absoluteUrl(image)),
     category: categoryName,
-    sku: product.id,
     url: absoluteUrl(`/product/${product.slug}`),
     offers: [
       {
@@ -154,6 +191,16 @@ export default async function ProductPage({
       },
     ],
   };
+
+  // Only emit brand/sku when the database has real values - never the product
+  // UUID, never a placeholder, never an invented brand.
+  if (brandName) {
+    productSchema.brand = { "@type": "Brand", name: brandName };
+  }
+  if (productSku) {
+    productSchema.sku = productSku;
+  }
+
   if (reviewCount > 0) {
     productSchema.aggregateRating = {
       "@type": "AggregateRating",
@@ -171,10 +218,22 @@ export default async function ProductPage({
             productSchema,
             {
               "@type": "BreadcrumbList",
+              // Mirrors the visible breadcrumb exactly: Home / Shop / parent
+              // category / [subcategory] / product. Subcategories have no page
+              // of their own, so that level carries a name but no URL.
               itemListElement: [
                 { "@type": "ListItem", position: 1, name: "Home", item: absoluteUrl("/") },
-                { "@type": "ListItem", position: 2, name: parentName, item: absoluteUrl(`/${parentSlug}`) },
-                { "@type": "ListItem", position: 3, name: product.name, item: absoluteUrl(`/product/${product.slug}`) },
+                { "@type": "ListItem", position: 2, name: "Shop", item: absoluteUrl("/shop") },
+                { "@type": "ListItem", position: 3, name: parentName, item: absoluteUrl(`/${parentSlug}`) },
+                ...(isSubcategory
+                  ? [{ "@type": "ListItem", position: 4, name: categoryName }]
+                  : []),
+                {
+                  "@type": "ListItem",
+                  position: isSubcategory ? 5 : 4,
+                  name: product.name,
+                  item: absoluteUrl(`/product/${product.slug}`),
+                },
               ],
             },
           ],
@@ -207,6 +266,7 @@ export default async function ProductPage({
         {/* Product Info */}
         <div className="lg:col-span-3">
           <p className="text-primary text-sm font-medium uppercase tracking-wider">{categoryName}</p>
+          {brandName && <p className="mt-1 text-sm text-foreground/50">By {brandName}</p>}
           <h1 className="mt-2 text-3xl lg:text-4xl font-bold text-foreground">{product.name}</h1>
 
           <div className="mt-4 flex items-center gap-3">
@@ -227,11 +287,26 @@ export default async function ProductPage({
             )}
           </div>
 
+          {/* SKU - only shown when the database has a real SKU (never the UUID) */}
+          {productSku && <p className="mt-2 text-xs text-foreground/40">SKU: {productSku}</p>}
+
           {/* Add to Cart - Client Component */}
           <AddToCartButton product={product} />
 
           {/* Details */}
           <div className="mt-10 space-y-6 border-t border-border pt-8">
+            {product.size && (
+              <div>
+                <h3 className="font-semibold text-foreground mb-2">Size</h3>
+                <p className="text-foreground/60 text-sm">{product.size}</p>
+              </div>
+            )}
+            {product.skin_type && (
+              <div>
+                <h3 className="font-semibold text-foreground mb-2">Skin Type</h3>
+                <p className="text-foreground/60 text-sm">{product.skin_type}</p>
+              </div>
+            )}
             {product.ingredients && (
               <div>
                 <h3 className="font-semibold text-foreground mb-2">Ingredients</h3>
@@ -272,8 +347,7 @@ export default async function ProductPage({
 
       
       {/* Reviews Section */}
-      {reviewCount > 0 && (
-        <div className="mt-16 border-t border-border pt-12">
+      <div className="mt-16 border-t border-border pt-12">
           <div className="flex items-center gap-4 mb-8">
             <h2 className="text-2xl font-bold text-foreground">Customer Reviews</h2>
             <div className="flex items-center gap-2 bg-muted px-3 py-1.5 rounded-full">
@@ -308,8 +382,12 @@ export default async function ProductPage({
               </div>
             ))}
           </div>
+
+          {/* Review Form */}
+          <div className="mt-8">
+            <ReviewForm productId={product.id} productName={product.name} />
+          </div>
         </div>
-      )}
 
       {/* Related Products */}
       {relatedProducts.length > 0 && (

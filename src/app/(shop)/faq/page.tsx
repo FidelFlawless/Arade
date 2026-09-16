@@ -1,21 +1,15 @@
-import type { Metadata } from "next";
 import FaqContent from "./FaqContent";
 import { faqCategories } from "./faqData";
-import { absoluteUrl, JsonLd } from "@/lib/seo";
+import { absoluteUrl, buildPageMetadata, JsonLd } from "@/lib/seo";
 
 // Title intentionally omits "| Arade" — the root title template ("%s | Arade")
 // appends the brand, producing the final title "FAQ | Arade".
-export const metadata: Metadata = {
+export const metadata = buildPageMetadata({
   title: "FAQ",
   description: "Frequently asked questions about Arade products, orders, shipping, returns and more.",
-  alternates: { canonical: absoluteUrl("/faq") },
-  openGraph: {
-    title: "Frequently Asked Questions | Arade",
-    description: "Frequently asked questions about Arade products, orders, shipping, returns and more.",
-    url: absoluteUrl("/faq"),
-    type: "website",
-  },
-};
+  path: "/faq",
+  ogTitle: "Frequently Asked Questions | Arade",
+});
 
 // FAQPage JSON-LD generated strictly from the visible FAQ content (faqData.ts).
 const faqSchema = {

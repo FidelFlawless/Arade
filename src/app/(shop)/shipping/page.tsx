@@ -1,11 +1,10 @@
-import type { Metadata } from "next";
-import { absoluteUrl } from "@/lib/seo";
+import { buildPageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
+export const metadata = buildPageMetadata({
   title: "Shipping Policy",
   description: "Review Arade shipping destinations, delivery timelines, and delivery fees.",
-  alternates: { canonical: absoluteUrl("/shipping") },
-};
+  path: "/shipping",
+});
 
 export default function ShippingPolicyPage() {
   return (

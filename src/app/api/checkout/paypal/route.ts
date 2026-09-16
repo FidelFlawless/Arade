@@ -1,32 +1,47 @@
 import { NextRequest, NextResponse } from "next/server";
-import Stripe from "stripe";
 import { createClient } from "@supabase/supabase-js";
 import { isValidNorthAmericanPhone } from "@/lib/utils";
-
-function getStripe() {
-  const rawKey = process.env.STRIPE_SECRET_KEY || "";
-  const cleanKey = rawKey.trim().replace(/^["']|["']$/g, "").replace(/[^\x20-\x7E]/g, "").replace(/\s+/g, "");
-  if (!cleanKey) {
-    throw new Error("STRIPE_SECRET_KEY is not configured in environment variables");
-  }
-  return new Stripe(cleanKey, {
-    maxNetworkRetries: 2,
-    timeout: 30000,
-  });
-}
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
+const PAYPAL_CLIENT_ID = process.env.PAYPAL_CLIENT_ID!;
+const PAYPAL_CLIENT_SECRET = process.env.PAYPAL_CLIENT_SECRET!;
+const PAYPAL_ENV = process.env.PAYPAL_ENVIRONMENT || "sandbox";
+
+const PAYPAL_BASE =
+  PAYPAL_ENV === "live"
+    ? "https://api-m.paypal.com"
+    : "https://api-m.sandbox.paypal.com";
+
+async function getPayPalAccessToken(): Promise<string> {
+  const auth = Buffer.from(`${PAYPAL_CLIENT_ID}:${PAYPAL_CLIENT_SECRET}`).toString("base64");
+
+  const response = await fetch(`${PAYPAL_BASE}/v1/oauth2/token`, {
+    method: "POST",
+    headers: {
+      Authorization: `Basic ${auth}`,
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: "grant_type=client_credentials",
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to get PayPal access token");
+  }
+
+  const data = await response.json();
+  return data.access_token;
+}
+
 export async function POST(req: NextRequest) {
   try {
-    const stripe = getStripe();
     const body = await req.json();
     const { userId, items, shippingAddress, country, currency } = body;
 
-    // 1. Verify user exists in database (service-role key bypasses RLS)
+    // 1. Verify user exists
     if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -118,46 +133,16 @@ export async function POST(req: NextRequest) {
     const deliveryFeeCAD = 9.99;
     const deliveryFeeUSD = 7.99;
 
-    const deliveryFee = subtotal >= deliveryThreshold
-      ? 0
-      : currency === "CAD"
-        ? deliveryFeeCAD
-        : deliveryFeeUSD;
+    const deliveryFee =
+      subtotal >= deliveryThreshold
+        ? 0
+        : currency === "CAD"
+          ? deliveryFeeCAD
+          : deliveryFeeUSD;
 
     const total = subtotal + deliveryFee;
 
-    // 6. Build Stripe line items
-    const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = validatedItems.map(
-      (item) => ({
-        price_data: {
-          currency: currency.toLowerCase(),
-          product_data: {
-            name: item.name,
-            ...(item.image && typeof item.image === "string" && item.image.startsWith("http")
-              ? { images: [item.image] }
-              : {}),
-          },
-          unit_amount: Math.round(item.serverPrice * 100), // Stripe uses cents
-        },
-        quantity: item.quantity,
-      })
-    );
-
-    // Add delivery fee as a line item if > 0
-    if (deliveryFee > 0) {
-      lineItems.push({
-        price_data: {
-          currency: currency.toLowerCase(),
-          product_data: {
-            name: "Delivery",
-          },
-          unit_amount: Math.round(deliveryFee * 100),
-        },
-        quantity: 1,
-      });
-    }
-
-    // 7. Create a pending order in our database before Stripe checkout
+    // 6. Create a pending order in our database
     const orderNumber = `ARD-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
 
     const { data: order, error: orderError } = await supabaseAdmin
@@ -202,7 +187,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Failed to create order", details: orderError.message }, { status: 500 });
     }
 
-    // 8. Create order items
+    // 7. Create order items
     const orderItems = validatedItems.map((item) => ({
       order_id: order.id,
       product_id: item.productId,
@@ -220,52 +205,114 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Failed to create order items", details: itemsError.message }, { status: 500 });
     }
 
-    // 9. Create Stripe Checkout Session
+    // 8. Create PayPal order server-side
+    const accessToken = await getPayPalAccessToken();
+
     const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://aradeshop.com";
 
-    const session = await stripe.checkout.sessions.create({
-      mode: "payment",
-      payment_method_types: ["card"],
-      customer_email: shippingAddress.email || undefined,
-      line_items: lineItems,
-      shipping_address_collection: {
-        allowed_countries: ["CA", "US"],
-      },
-      shipping_options: [
-              {
-          shipping_rate_data: {
-            type: "fixed_amount",
-            fixed_amount: { amount: 0, currency: currency.toLowerCase() },
-            display_name: deliveryFee === 0 ? "Free Delivery" : "Standard Delivery",
-            delivery_estimate: {
-              minimum: { unit: "business_day", value: 3 },
-              maximum: { unit: "business_day", value: 7 },
+    const paypalBody = {
+      intent: "CAPTURE",
+      purchase_units: [
+        {
+          reference_id: order.order_number,
+          description: `Arade Order ${order.order_number}`.substring(0, 127),
+          amount: {
+            currency_code: currency,
+            value: total.toFixed(2),
+            breakdown: {
+              item_total: {
+                currency_code: currency,
+                value: subtotal.toFixed(2),
+              },
+              shipping: {
+                currency_code: currency,
+                value: deliveryFee.toFixed(2),
+              },
+            },
+          },
+          items: validatedItems.map((item) => ({
+            name: item.name.substring(0, 127),
+            unit_amount: {
+              currency_code: currency,
+              value: item.serverPrice.toFixed(2),
+            },
+            quantity: item.quantity.toString(),
+            category: "PHYSICAL_GOODS",
+          })),
+          shipping: {
+            name: {
+              full_name: `${shippingAddress.first_name} ${shippingAddress.last_name}`.substring(0, 300),
+            },
+            address: {
+              address_line_1: shippingAddress.address_line1.substring(0, 300),
+              ...(shippingAddress.address_line2
+                ? { address_line_2: shippingAddress.address_line2.substring(0, 300) }
+                : {}),
+              admin_area_2: shippingAddress.city.substring(0, 120),
+              admin_area_1: shippingAddress.province_state.substring(0, 300),
+              postal_code: shippingAddress.postal_code.substring(0, 10),
+              country_code: country,
             },
           },
         },
       ],
-      metadata: {
-        order_id: order.id,
-        order_number: order.order_number,
-        user_id: userId,
+      application_context: {
+        brand_name: "Arade",
+        locale: "en-US",
+        landing_page: "BILLING",
+        shipping_preference: "SET_PROVIDED_ADDRESS",
+        user_action: "PAY_NOW",
+        return_url: `${baseUrl}/order/success?paypal_order_id=REPLACE`,
+        cancel_url: `${baseUrl}/checkout?cancelled=true`,
       },
-      success_url: `${baseUrl}/order/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${baseUrl}/checkout?cancelled=true`,
+    };
+
+    const paypalResponse = await fetch(`${PAYPAL_BASE}/v2/checkout/orders`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+        Prefer: "return=representation",
+      },
+      body: JSON.stringify(paypalBody),
     });
 
-    // 10. Update order with Stripe session ID
+    if (!paypalResponse.ok) {
+      const errorData = await paypalResponse.json().catch(() => ({}));
+      console.error("PayPal create order error (status:", paypalResponse.status, "):", JSON.stringify(errorData, null, 2));
+
+      // Clean up the pending order since PayPal creation failed
+      await supabaseAdmin.from("orders").delete().eq("id", order.id);
+
+      // Extract detailed error message
+      const details = errorData?.message || errorData?.name || "Unknown PayPal error";
+      const debugId = errorData?.debug_id || "";
+      return NextResponse.json(
+        { error: "Failed to create PayPal order", details: `${details}${debugId ? " (debug: " + debugId + ")" : ""}` },
+        { status: 500 }
+      );
+    }
+
+    const paypalOrder = await paypalResponse.json();
+
+    // 9. Store PayPal order ID on the Arade order
     await supabaseAdmin
       .from("orders")
-      .update({ stripe_session_id: session.id })
+      .update({ stripe_session_id: `paypal:${paypalOrder.id}` })
       .eq("id", order.id);
+
+    // Update return_url with actual PayPal order ID
+    const finalReturnUrl = `${baseUrl}/order/success?paypal_order_id=${paypalOrder.id}`;
 
     return NextResponse.json({
       success: true,
-      url: session.url,
-      sessionId: session.id,
+      paypalOrderId: paypalOrder.id,
+      orderId: order.id,
+      orderNumber: order.order_number,
+      returnUrl: finalReturnUrl,
     });
   } catch (error: unknown) {
-    console.error("Stripe checkout error:", error);
+    console.error("PayPal checkout error:", error);
     const message = error instanceof Error ? error.message : "Internal server error";
     return NextResponse.json({ error: message }, { status: 500 });
   }

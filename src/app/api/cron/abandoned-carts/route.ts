@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
 const supabaseAdmin = createClient(
@@ -102,7 +102,7 @@ async function sendAbandonedCartEmail(
 }
 
 // GET - Called by Vercel cron every hour
-export async function GET(req: NextRequest) {
+export async function GET() {
   // No auth check needed - endpoint only sends reminder emails
 
   try {
@@ -113,6 +113,8 @@ export async function GET(req: NextRequest) {
       .from("abandoned_carts")
       .select("*")
       .eq("email_sent", false)
+      .not("email", "is", null)
+      .neq("email", "")
       .lt("last_active", threeHoursAgo)
       .limit(50);
 
@@ -152,7 +154,7 @@ export async function GET(req: NextRequest) {
         cart.email,
         firstName,
         cart.items || [],
-        cart.cart_total || 0,
+        cartTotal,
         cart.currency || "CAD"
       );
 

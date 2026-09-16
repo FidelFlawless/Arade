@@ -24,8 +24,9 @@ export default function NewProductPage() {
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const [form, setForm] = useState({
-    name: "", slug: "", description: "", price_cad: "", price_usd: "", stock_quantity: "",
+    name: "", slug: "", description: "", sku: "", price_cad: "", price_usd: "", stock_quantity: "",
     is_active: true, is_featured: false,
+    brand: "", size: "", skin_type: "", ingredients: "", benefits: "", how_to_use: "",
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [usdManuallyEdited, setUsdManuallyEdited] = useState(false);
@@ -85,12 +86,10 @@ export default function NewProductPage() {
     if (Object.keys(newErrors).length > 0) { setErrors(newErrors); return; }
 
     setLoading(true);
-    const imageUrls = await uploadImages();
+    try {
+      const imageUrls = await uploadImages();
 
-    const res = await fetch("/api/admin/products", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
+      const body: Record<string, unknown> = {
         name: form.name.trim(),
         slug: form.slug || generateSlug(form.name),
         description: form.description.trim(),
@@ -101,16 +100,34 @@ export default function NewProductPage() {
         is_active: form.is_active,
         is_featured: form.is_featured,
         images: imageUrls,
-      }),
-    });
+      };
+      // Only include SKU if the admin typed one — otherwise leave it out so the
+      // database trigger can generate a unique ARA-CATEGORY-NUMBER SKU.
+      if (form.sku.trim()) body.sku = form.sku.trim();
+      if (form.brand.trim()) body.brand = form.brand.trim();
+      if (form.size.trim()) body.size = form.size.trim();
+      if (form.skin_type.trim()) body.skin_type = form.skin_type.trim();
+      if (form.ingredients.trim()) body.ingredients = form.ingredients.trim();
+      if (form.benefits.trim()) body.benefits = form.benefits.trim();
+      if (form.how_to_use.trim()) body.how_to_use = form.how_to_use.trim();
 
-    setLoading(false);
-    if (!res.ok) {
-      const err = await res.json();
-      alert("Error: " + err.error);
-      return;
+      const res = await fetch("/api/admin/products", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        alert("Error: " + err.error);
+        setLoading(false);
+        return;
+      }
+      router.push("/admin/products");
+    } catch (err) {
+      alert("Failed to save: " + (err instanceof Error ? err.message : "Unknown error"));
+      setLoading(false);
     }
-    router.push("/admin/products");
   };
 
   return (
@@ -144,6 +161,13 @@ export default function NewProductPage() {
                 rows={4} className={`w-full px-4 py-2.5 border rounded-lg text-sm outline-none resize-none ${errors.description ? "border-red-500" : "border-border"}`}
                 placeholder="Describe the product..." />
               {errors.description && <p className="text-xs text-red-600 mt-1">{errors.description}</p>}
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-2">SKU (optional)</label>
+              <input type="text" value={form.sku} onChange={(e) => setForm({ ...form, sku: e.target.value })}
+                className="w-full px-4 py-2.5 border border-border rounded-lg text-sm outline-none"
+                placeholder="Leave blank to auto-generate, e.g. ARA-SKIN-0001" />
+              <p className="text-xs text-foreground/50 mt-1">If left empty, a unique SKU (ARA-CATEGORY-NUMBER) is generated automatically. The SKU is permanent once assigned.</p>
             </div>
           </div>
         </div>
@@ -227,6 +251,51 @@ export default function NewProductPage() {
                 {subCategories.map((cat) => (<option key={cat.id} value={cat.id}>{cat.name}</option>))}
               </select>
               {errors.category && <p className="text-xs text-red-600 mt-1">{errors.category}</p>}
+            </div>
+          </div>
+        </div>
+
+        {/* Product Details */}
+        <div className="card">
+          <h2 className="text-lg font-semibold text-foreground mb-4">Product Details</h2>
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">Brand</label>
+                <input type="text" value={form.brand} onChange={(e) => setForm({ ...form, brand: e.target.value })}
+                  className="w-full px-4 py-2.5 border border-border rounded-lg text-sm outline-none"
+                  placeholder="e.g. Arade" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">Size</label>
+                <input type="text" value={form.size} onChange={(e) => setForm({ ...form, size: e.target.value })}
+                  className="w-full px-4 py-2.5 border border-border rounded-lg text-sm outline-none"
+                  placeholder="e.g. 50ml, Large, One Size" />
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-2">Skin Type</label>
+              <input type="text" value={form.skin_type} onChange={(e) => setForm({ ...form, skin_type: e.target.value })}
+                className="w-full px-4 py-2.5 border border-border rounded-lg text-sm outline-none"
+                placeholder="e.g. All skin types, Oily, Dry, Combination" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-2">Ingredients</label>
+              <textarea value={form.ingredients} onChange={(e) => setForm({ ...form, ingredients: e.target.value })}
+                rows={3} className="w-full px-4 py-2.5 border border-border rounded-lg text-sm outline-none resize-none"
+                placeholder="List the key ingredients..." />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-2">Benefits</label>
+              <textarea value={form.benefits} onChange={(e) => setForm({ ...form, benefits: e.target.value })}
+                rows={3} className="w-full px-4 py-2.5 border border-border rounded-lg text-sm outline-none resize-none"
+                placeholder="Describe the key benefits..." />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-2">How to Use</label>
+              <textarea value={form.how_to_use} onChange={(e) => setForm({ ...form, how_to_use: e.target.value })}
+                rows={3} className="w-full px-4 py-2.5 border border-border rounded-lg text-sm outline-none resize-none"
+                placeholder="Instructions for using this product..." />
             </div>
           </div>
         </div>

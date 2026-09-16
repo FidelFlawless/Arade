@@ -1,13 +1,15 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { requireAdminUser } from "@/lib/auth/admin";
 
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
-
-// GET - List all customers with order stats
+// GET - List all customers with order stats (admin only)
 export async function GET() {
+  // Authorization runs first: the service-role client is only created once the
+  // request has been verified as an authenticated admin.
+  const auth = await requireAdminUser();
+  if (!auth.allowed) return auth.response;
+
+  const supabaseAdmin = createAdminClient();
   const { data: profiles, error } = await supabaseAdmin
     .from("profiles")
     .select("*")

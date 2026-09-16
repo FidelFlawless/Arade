@@ -1,18 +1,25 @@
 import CategoryPage from "@/app/(shop)/category/CategoryPage";
 import type { Metadata } from "next";
-import { absoluteUrl, getActiveCategory, JsonLd, truncateDescription } from "@/lib/seo";
+import { absoluteUrl, buildPageMetadata, countActiveCategoryProducts, getActiveCategory, JsonLd, truncateDescription } from "@/lib/seo";
 
 const fallbackDescription = "Explore wigs, hair care and accessories selected to help you create and maintain your desired look.";
 
 export async function generateMetadata(): Promise<Metadata> {
-  const category = await getActiveCategory("hair");
+  const [category, productCount] = await Promise.all([
+    getActiveCategory("hair"),
+    countActiveCategoryProducts("hair"),
+  ]);
   const description = truncateDescription(category?.description, fallbackDescription);
-  return {
+  // Empty parent categories stay crawlable (follow) but are excluded from the
+  // index until products exist; the page becomes indexable automatically as
+  // soon as the category has active products.
+  return buildPageMetadata({
     title: "Hair Products",
     description,
-    alternates: { canonical: absoluteUrl("/hair") },
-    openGraph: { title: "Hair Products | Arade", description, url: absoluteUrl("/hair"), type: "website" },
-  };
+    path: "/hair",
+    ogTitle: "Hair Products | Arade",
+    index: productCount > 0,
+  });
 }
 
 export default async function HairPage() {

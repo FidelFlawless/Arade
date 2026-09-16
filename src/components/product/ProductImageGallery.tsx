@@ -31,13 +31,15 @@ export default function ProductImageGallery({ images, name }: Props) {
 
   return (
     <div className="space-y-3">
-      {/* Main image */}
+      {/* Main image - the first one is the above-the-fold LCP image, so it is
+          never lazy-loaded. Alt text is the real product name. */}
       <div className="relative bg-muted rounded-2xl overflow-hidden aspect-square group">
         <Image
           src={allImages[selected]}
-          alt={`${name} - Image ${selected + 1}`}
+          alt={selected === 0 ? name : `${name} - Image ${selected + 1}`}
           fill
           sizes="(min-width: 1024px) 40vw, 90vw"
+          priority={selected === 0}
           decoding="async"
           style={{ objectFit: "cover" }}
         />

@@ -30,11 +30,15 @@ interface OrderDetail {
   profiles: { full_name: string; email: string } | null;
   order_items: {
     id: string;
+    product_id: string;
     product_name: string;
     quantity: number;
     unit_price: number;
-    total_price: number;
-    currency: string;
+    subtotal: number;
+    products?: {
+      slug?: string;
+      images?: string[] | null;
+    } | null;
   }[];
 }
 
@@ -60,7 +64,7 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
   async function loadOrder() {
     const { data } = await supabase
       .from("orders")
-      .select("*, profiles(full_name, email), order_items(*)")
+      .select("*, profiles(full_name, email), order_items(*, products(slug, images))")
       .eq("id", id)
       .single();
 
@@ -71,11 +75,11 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
           delivery_fee: Number(data.delivery_fee ?? 0),
           discount: Number(data.discount ?? 0),
           total: Number(data.total ?? 0),
-          order_items: (data.order_items ?? []).map((item: OrderDetail["order_items"][number]) => ({
+          order_items: (data.order_items ?? []).map((item: any) => ({
             ...item,
             quantity: Number(item.quantity ?? 0),
             unit_price: Number(item.unit_price ?? 0),
-            total_price: Number(item.total_price ?? 0),
+            subtotal: Number(item.subtotal ?? (Number(item.unit_price ?? 0) * Number(item.quantity ?? 0))),
           })),
         }
       : null;
@@ -159,21 +163,45 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
             <h2 className="text-lg font-semibold text-foreground mb-4">Order Items</h2>
             <div className="space-y-3">
               {(order.order_items ?? []).map((item) => {
-                const safeTotal = Number(item.total_price ?? 0);
+                const safeTotal = Number(item.subtotal ?? (Number(item.unit_price ?? 0) * Number(item.quantity ?? 0)));
                 const safeQty = Number(item.quantity ?? 0);
+                const productImage = item.products?.images?.[0];
+                const currencyPrefix = order.currency === "CAD" ? "C$" : "US$";
                 return (
                   <div key={item.id} className="flex items-center justify-between py-3 border-b border-border last:border-0">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-muted rounded-lg flex items-center justify-center">
-                        <Package className="w-5 h-5 text-foreground/30" />
-                      </div>
+                      {productImage ? (
+                        <div className="relative w-12 h-12 rounded-lg overflow-hidden bg-muted shrink-0 border border-border">
+                          <img
+                            src={productImage}
+                            alt={item.product_name || "Product"}
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                      ) : (
+                        <div className="w-12 h-12 bg-muted rounded-lg flex items-center justify-center shrink-0 border border-border">
+                          <Package className="w-6 h-6 text-foreground/30" />
+                        </div>
+                      )}
                       <div>
-                        <p className="font-medium text-foreground">{item.product_name || "Product"}</p>
-                        <p className="text-xs text-foreground/50">Qty: {safeQty}</p>
+                        {item.products?.slug ? (
+                          <Link
+                            href={`/product/${item.products.slug}`}
+                            target="_blank"
+                            className="font-medium text-foreground hover:text-primary transition-colors line-clamp-1"
+                          >
+                            {item.product_name || "Product"}
+                          </Link>
+                        ) : (
+                          <p className="font-medium text-foreground">{item.product_name || "Product"}</p>
+                        )}
+                        <p className="text-xs text-foreground/50">
+                          Qty: {safeQty} × {currencyPrefix}{Number(item.unit_price ?? 0).toFixed(2)}
+                        </p>
                       </div>
                     </div>
-                    <p className="text-sm font-medium">
-                      {(item.currency === "CAD" ? "C$" : "US$")}{safeTotal.toFixed(2)}
+                    <p className="text-sm font-semibold text-foreground">
+                      {currencyPrefix}{safeTotal.toFixed(2)}
                     </p>
                   </div>
                 );

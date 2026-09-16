@@ -29,8 +29,10 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
   const [form, setForm] = useState({
     name: "", slug: "", description: "", price_cad: "", price_usd: "", stock_quantity: "",
     is_active: true, is_featured: false,
+    brand: "", size: "", skin_type: "", ingredients: "", benefits: "", how_to_use: "",
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [sku, setSku] = useState<string>("");
   const [usdManuallyEdited, setUsdManuallyEdited] = useState(false);
   const { rate, loading: rateLoading, lastUpdated, convertCadToUsd } = useExchangeRate();
   const supabase = createClient();
@@ -49,6 +51,13 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
     is_featured: boolean;
     images: string[] | null;
     category_id: string | null;
+    sku: string | null;
+    brand: string | null;
+    size: string | null;
+    skin_type: string | null;
+    ingredients: string | null;
+    benefits: string | null;
+    how_to_use: string | null;
   }
 
   async function loadProduct() {
@@ -62,8 +71,11 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
           price_cad: String(data.price_cad || ""), price_usd: String(data.price_usd || ""),
           stock_quantity: String(data.stock_quantity || ""),
           is_active: data.is_active ?? true, is_featured: data.is_featured ?? false,
+          brand: data.brand || "", size: data.size || "", skin_type: data.skin_type || "",
+          ingredients: data.ingredients || "", benefits: data.benefits || "", how_to_use: data.how_to_use || "",
         });
         setExistingImages(data.images || []);
+        setSku(data.sku || "");
         if (data.category_id) setSelectedSubCategory(data.category_id);
       }
     }
@@ -127,27 +139,35 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
     if (Object.keys(newErrors).length > 0) { setErrors(newErrors); return; }
 
     setSaving(true);
-    const newUrls = await uploadNewImages();
-    const allImages = [...existingImages, ...newUrls];
+    try {
+      const newUrls = await uploadNewImages();
+      const allImages = [...existingImages, ...newUrls];
 
-    const res = await fetch("/api/admin/products", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        id, name: form.name.trim(), slug: form.slug, description: form.description.trim(),
-        price_cad: Number(form.price_cad), price_usd: Number(form.price_usd),
-        category_id: selectedSubCategory, stock_quantity: Number(form.stock_quantity) || 0,
-        is_active: form.is_active, is_featured: form.is_featured, images: allImages,
-      }),
-    });
+      const res = await fetch("/api/admin/products", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id, name: form.name.trim(), slug: form.slug, description: form.description.trim(),
+          price_cad: Number(form.price_cad), price_usd: Number(form.price_usd),
+          category_id: selectedSubCategory, stock_quantity: Number(form.stock_quantity) || 0,
+          is_active: form.is_active, is_featured: form.is_featured, images: allImages,
+          brand: form.brand.trim() || null, size: form.size.trim() || null,
+          skin_type: form.skin_type.trim() || null, ingredients: form.ingredients.trim() || null,
+          benefits: form.benefits.trim() || null, how_to_use: form.how_to_use.trim() || null,
+        }),
+      });
 
-    setSaving(false);
-    if (!res.ok) {
-      const err = await res.json();
-      alert("Error: " + err.error);
-      return;
+      if (!res.ok) {
+        const err = await res.json();
+        alert("Error: " + err.error);
+        setSaving(false);
+        return;
+      }
+      router.push("/admin/products");
+    } catch (err) {
+      alert("Failed to save: " + (err instanceof Error ? err.message : "Unknown error"));
+      setSaving(false);
     }
-    router.push("/admin/products");
   };
 
   if (loading) {
@@ -191,6 +211,11 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
               <textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })}
                 rows={4} className={`w-full px-4 py-2.5 border rounded-lg text-sm outline-none resize-none ${errors.description ? "border-red-500" : "border-border"}`} />
               {errors.description && <p className="text-xs text-red-600 mt-1">{errors.description}</p>}
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-2">SKU</label>
+              <p className="text-sm text-foreground/60 bg-muted px-4 py-2.5 rounded-lg">{sku || "Not set"}</p>
+              <p className="text-xs text-foreground/50 mt-1">The SKU is permanent - it never changes when editing a product.</p>
             </div>
           </div>
         </div>
@@ -274,6 +299,51 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
                 {subCategories.map((cat) => (<option key={cat.id} value={cat.id}>{cat.name}</option>))}
               </select>
               {errors.category && <p className="text-xs text-red-600 mt-1">{errors.category}</p>}
+            </div>
+          </div>
+        </div>
+
+        {/* Product Details */}
+        <div className="card">
+          <h2 className="text-lg font-semibold text-foreground mb-4">Product Details</h2>
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">Brand</label>
+                <input type="text" value={form.brand} onChange={(e) => setForm({ ...form, brand: e.target.value })}
+                  className="w-full px-4 py-2.5 border border-border rounded-lg text-sm outline-none"
+                  placeholder="e.g. Arade" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">Size</label>
+                <input type="text" value={form.size} onChange={(e) => setForm({ ...form, size: e.target.value })}
+                  className="w-full px-4 py-2.5 border border-border rounded-lg text-sm outline-none"
+                  placeholder="e.g. 50ml, Large, One Size" />
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-2">Skin Type</label>
+              <input type="text" value={form.skin_type} onChange={(e) => setForm({ ...form, skin_type: e.target.value })}
+                className="w-full px-4 py-2.5 border border-border rounded-lg text-sm outline-none"
+                placeholder="e.g. All skin types, Oily, Dry, Combination" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-2">Ingredients</label>
+              <textarea value={form.ingredients} onChange={(e) => setForm({ ...form, ingredients: e.target.value })}
+                rows={3} className="w-full px-4 py-2.5 border border-border rounded-lg text-sm outline-none resize-none"
+                placeholder="List the key ingredients..." />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-2">Benefits</label>
+              <textarea value={form.benefits} onChange={(e) => setForm({ ...form, benefits: e.target.value })}
+                rows={3} className="w-full px-4 py-2.5 border border-border rounded-lg text-sm outline-none resize-none"
+                placeholder="Describe the key benefits..." />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-2">How to Use</label>
+              <textarea value={form.how_to_use} onChange={(e) => setForm({ ...form, how_to_use: e.target.value })}
+                rows={3} className="w-full px-4 py-2.5 border border-border rounded-lg text-sm outline-none resize-none"
+                placeholder="Instructions for using this product..." />
             </div>
           </div>
         </div>
