@@ -8,6 +8,7 @@ import { useCart } from "@/components/providers/CartProvider";
 import { useAuth } from "@/components/providers/AuthProvider";
 import { formatPrice, calculateDeliveryFee } from "@/lib/utils";
 import { FREE_DELIVERY_THRESHOLD } from "@/lib/constants";
+import BackButton from "@/components/ui/BackButton";
 
 export default function CartPage() {
   const router = useRouter();
@@ -52,6 +53,7 @@ export default function CartPage() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
+      <BackButton />
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6 sm:mb-8">
         <div>
           <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-foreground">

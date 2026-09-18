@@ -4,7 +4,8 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useAuth } from "@/components/providers/AuthProvider";
 import { createClient } from "@/lib/supabase/client";
-import { Package, Loader2, ChevronRight, XCircle, ArrowLeft } from "lucide-react";
+import { Package, Loader2, ChevronRight, XCircle } from "lucide-react";
+import BackButton from "@/components/ui/BackButton";
 
 interface OrderRow {
   id: string;
@@ -15,7 +16,7 @@ interface OrderRow {
   payment_status: string;
   currency: string;
   total: number;
-  order_items: { id: string }[];
+  order_items: { id: string; products?: { name: string; images: string[] } | null }[];
 }
 
 const statusColors: Record<string, string> = {
@@ -43,7 +44,7 @@ export default function OrdersPage() {
     const fetchOrders = async () => {
       const { data, error } = await supabase
         .from("orders")
-        .select("*, order_items(id)")
+        .select("*, order_items(id, products(name, images))")
         .eq("user_id", user.id)
         .order("created_at", { ascending: false });
 
@@ -98,13 +99,7 @@ export default function OrdersPage() {
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
-      <Link
-        href="/account"
-        className="inline-flex items-center gap-2 text-sm text-foreground/60 hover:text-primary transition-colors mb-5"
-      >
-        <ArrowLeft className="w-4 h-4" />
-        Back to Account
-      </Link>
+      <BackButton />
       <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-foreground mb-6 sm:mb-8">My Orders</h1>
 
       {error && <div className="mb-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" role="status">{error}</div>}
@@ -130,8 +125,16 @@ export default function OrdersPage() {
               className="card flex items-center justify-between gap-4 hover:border-primary transition-colors"
             >
               <Link href={`/order/${order.order_number}`} className="flex min-w-0 flex-1 items-center gap-4">
-                <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center">
-                  <Package className="w-6 h-6 text-primary" />
+                <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center overflow-hidden flex-shrink-0">
+                  {order.order_items?.[0]?.products?.images?.[0] ? (
+                    <img
+                      src={order.order_items[0].products.images[0]}
+                      alt={order.order_items[0].products.name || "Product"}
+                      className="w-full h-full object-contain"
+                    />
+                  ) : (
+                    <Package className="w-6 h-6 text-primary" />
+                  )}
                 </div>
                 <div>
                   <p className="font-medium text-foreground">

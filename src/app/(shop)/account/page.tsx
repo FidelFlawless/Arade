@@ -6,6 +6,7 @@ import { useAuth } from "@/components/providers/AuthProvider";
 import { User, Package, MapPin, LogOut, Loader2, ArrowLeft, Lock, Trash2, Eye, EyeOff } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { isValidNorthAmericanPhone } from "@/lib/utils";
+import BackButton from "@/components/ui/BackButton";
 
 const accountLinks = [
   { href: "/account", label: "Profile", icon: User },
@@ -139,13 +140,7 @@ export default function AccountPage() {
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
-      <Link
-        href="/shop"
-        className="inline-flex items-center gap-2 text-sm text-foreground/60 hover:text-primary transition-colors mb-5"
-      >
-        <ArrowLeft className="w-4 h-4" />
-        Back to Shop
-      </Link>
+      <BackButton />
       <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-foreground mb-6 sm:mb-8">My Account</h1>
 
       {(accountMessage || accountError) && (

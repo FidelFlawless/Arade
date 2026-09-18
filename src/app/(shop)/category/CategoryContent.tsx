@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { Search, X } from "lucide-react";
 import ProductCard from "@/components/product/ProductCard";
+import BackButton from "@/components/ui/BackButton";
 import type { CategoryProduct, Subcategory } from "./CategoryPage";
 
 interface CategoryContentProps {
@@ -60,6 +61,7 @@ export default function CategoryContent({
       {/* Category Hero */}
       <section className="bg-[#f5f0ea] py-12 lg:py-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <BackButton />
           <span className="text-sm font-medium tracking-widest text-primary uppercase">
             {title}
           </span>

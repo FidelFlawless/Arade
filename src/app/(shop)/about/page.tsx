@@ -2,6 +2,7 @@ import { Metadata } from "next";
 import { SITE_NAME } from "@/lib/constants";
 import { Gem, Leaf, Globe } from "lucide-react";
 import { buildPageMetadata } from "@/lib/seo";
+import BackButton from "@/components/ui/BackButton";
 
 export const metadata: Metadata = buildPageMetadata({
   title: "About Arade",
@@ -13,6 +14,7 @@ export const metadata: Metadata = buildPageMetadata({
 export default function AboutPage() {
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12 lg:py-20">
+      <BackButton />
       {/* Hero */}
       <div className="text-center mb-16">
         <h1 className="text-4xl lg:text-5xl font-serif text-foreground mb-6">

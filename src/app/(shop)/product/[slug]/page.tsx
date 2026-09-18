@@ -8,6 +8,7 @@ import { Check, X } from "lucide-react";
 import AddToCartButton from "@/components/product/AddToCartButton";
 import ProductImageGallery from "@/components/product/ProductImageGallery";
 import ReviewForm from "@/components/product/ReviewForm";
+import BackButton from "@/components/ui/BackButton";
 import { absoluteUrl, DEFAULT_OG_IMAGE, JsonLd } from "@/lib/seo";
 
 /** Collapse whitespace and trim; returns "" for null/undefined values. */
@@ -240,8 +241,10 @@ export default async function ProductPage({
         }}
       />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
+      {/* Mobile back button */}
+      <BackButton />
       {/* Breadcrumb */}
-      <nav className="text-sm text-foreground/60 mb-8">
+      <nav className="text-sm text-foreground/60 mb-8 hidden lg:block">
         <Link href="/" className="hover:text-primary">Home</Link>
         <span className="mx-2">/</span>
         <Link href="/shop" className="hover:text-primary">Shop</Link>
@@ -348,7 +351,7 @@ export default async function ProductPage({
       
       {/* Reviews Section */}
       <div className="mt-16 border-t border-border pt-12">
-          <div className="flex items-center gap-4 mb-8">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 mb-8">
             <h2 className="text-2xl font-bold text-foreground">Customer Reviews</h2>
             <div className="flex items-center gap-2 bg-muted px-3 py-1.5 rounded-full">
               <div className="flex">

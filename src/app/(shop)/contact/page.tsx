@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Mail, Phone, MapPin, Clock, Send, Loader2, CheckCircle } from "lucide-react";
+import BackButton from "@/components/ui/BackButton";
 
 interface Settings {
   store_email: string;
@@ -58,6 +59,7 @@ export default function ContactPage() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 lg:py-20">
+      <BackButton />
       <div className="text-center mb-12">
         <h1 className="text-4xl font-bold text-foreground mb-4">
           Get in Touch
