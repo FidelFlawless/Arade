@@ -695,7 +695,7 @@ export default function CheckoutPage() {
               </div>
 
               {/* Stripe: Place Order button (mobile) */}
-              {paymentMethod === "stripe" && (
+              {checkoutStep === "payment" && paymentMethod === "stripe" && (
                 <button
                   type="button"
                   onClick={handleStripeCheckout}
@@ -792,7 +792,7 @@ export default function CheckoutPage() {
             </div>
 
             {/* Stripe: Place order button (desktop) */}
-            {paymentMethod === "stripe" && (
+            {checkoutStep === "payment" && paymentMethod === "stripe" && (
               <button
                 onClick={handleStripeCheckout}
                 disabled={loading}
