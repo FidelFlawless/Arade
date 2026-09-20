@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 import { createClient } from "@supabase/supabase-js";
 import { isValidNorthAmericanPhone } from "@/lib/utils";
+import { DELIVERY_FEE_CAD, DELIVERY_FEE_USD } from "@/lib/constants";
 
 function getStripe() {
   const rawKey = process.env.STRIPE_SECRET_KEY || "";
@@ -113,10 +114,25 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // 5. Calculate delivery fee SERVER-SIDE
+    // 5. Calculate delivery fee SERVER-SIDE from store settings (with fallback)
     const deliveryThreshold = 180;
-    const deliveryFeeCAD = 9.99;
-    const deliveryFeeUSD = 7.99;
+    let deliveryFeeCAD = DELIVERY_FEE_CAD;
+    let deliveryFeeUSD = DELIVERY_FEE_USD;
+    try {
+      const { data: settingsRows } = await supabaseAdmin
+        .from("store_settings")
+        .select("key, value")
+        .in("key", ["delivery_fee_cad", "delivery_fee_usd"]);
+      settingsRows?.forEach((row) => {
+        const num = Number(row.value);
+        if (Number.isFinite(num) && num >= 0) {
+          if (row.key === "delivery_fee_cad") deliveryFeeCAD = num;
+          if (row.key === "delivery_fee_usd") deliveryFeeUSD = num;
+        }
+      });
+    } catch {
+      // fall back to defaults
+    }
 
     const deliveryFee = subtotal >= deliveryThreshold
       ? 0

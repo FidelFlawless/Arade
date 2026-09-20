@@ -1,5 +1,6 @@
 import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
+import { FREE_DELIVERY_THRESHOLD, DELIVERY_FEE_CAD, DELIVERY_FEE_USD } from "@/lib/constants";
 
 // Merge Tailwind classes safely
 export function cn(...inputs: ClassValue[]) {
@@ -60,8 +61,8 @@ export function calculateDeliveryFee(
   subtotal: number,
   currency: "CAD" | "USD" = "CAD"
 ): number {
-  if (subtotal >= 180) return 0;
-  return currency === "CAD" ? 9.99 : 7.99;
+  if (subtotal >= FREE_DELIVERY_THRESHOLD) return 0;
+  return currency === "CAD" ? DELIVERY_FEE_CAD : DELIVERY_FEE_USD;
 }
 
 // Get the appropriate currency symbol

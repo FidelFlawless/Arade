@@ -6,8 +6,8 @@ export const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://www.aradesh
 
 // Delivery settings
 export const FREE_DELIVERY_THRESHOLD = 180; // Orders $180+ get free delivery
-export const DELIVERY_FEE_CAD = 9.99;
-export const DELIVERY_FEE_USD = 7.99;
+export const DELIVERY_FEE_CAD = 20;
+export const DELIVERY_FEE_USD = 14.29;
 
 // Supported countries
 export const SUPPORTED_COUNTRIES = [

@@ -19,9 +19,9 @@ describe("Arade utility rules", () => {
   });
 
   it("calculates delivery fees at the configured threshold", () => {
-    expect(calculateDeliveryFee(179.99, "CAD")).toBe(9.99);
+    expect(calculateDeliveryFee(179.99, "CAD")).toBe(20);
     expect(calculateDeliveryFee(180, "CAD")).toBe(0);
-    expect(calculateDeliveryFee(50, "USD")).toBe(7.99);
+    expect(calculateDeliveryFee(50, "USD")).toBe(14.29);
   });
 
   it("formats CAD and USD prices", () => {

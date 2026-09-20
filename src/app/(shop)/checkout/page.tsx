@@ -94,16 +94,16 @@ export default function CheckoutPage() {
 
   const [storeSettings, setStoreSettings] = useState({
     free_delivery_threshold: 180,
-    delivery_fee_cad: 9.99,
-    delivery_fee_usd: 7.99,
+    delivery_fee_cad: 20,
+    delivery_fee_usd: 14.29,
   });
 
   useEffect(() => {
     fetch("/api/settings").then((r) => r.json()).then((data) => {
       setStoreSettings({
         free_delivery_threshold: Number(data.free_delivery_threshold) || 180,
-        delivery_fee_cad: Number(data.delivery_fee_cad) || 9.99,
-        delivery_fee_usd: Number(data.delivery_fee_usd) || 7.99,
+        delivery_fee_cad: Number(data.delivery_fee_cad) || 20,
+        delivery_fee_usd: Number(data.delivery_fee_usd) || 14.29,
       });
     }).catch(() => {});
   }, []);

@@ -11,8 +11,8 @@ export default function AdminSettingsPage() {
     store_address: "Ontario\nCanada",
     business_hours: "Mon - Fri: 9:00 AM - 6:00 PM EST\nSat: 10:00 AM - 4:00 PM EST\nSun: Closed",
     free_delivery_threshold: "180",
-    delivery_fee_cad: "9.99",
-    delivery_fee_usd: "7.99",
+    delivery_fee_cad: "20",
+    delivery_fee_usd: "14.29",
     tax_rate: "0",
   });
   const [loading, setLoading] = useState(true);
