@@ -225,7 +225,14 @@ export async function sendOrderConfirmationEmail(orderId: string): Promise<boole
       <div style="margin-top: 24px;">
         <p style="margin: 0 0 8px; font-weight: 700; color: #1a1a2e; font-size: 14px;">Shipping to</p>
         ${addressHtml}
-      </div>`
+      </div>
+
+      <div style="text-align: center; margin-top: 28px;">
+        <a href="${SITE_URL}/order/${esc(o.order_number)}" style="display: inline-block; background-color: #8B5E3C; color: white; padding: 14px 40px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 15px;">View Order Details</a>
+      </div>
+      <p style="text-align: center; color: #999; font-size: 12px; margin-top: 12px;">
+        You can also track this order anytime from your account.
+      </p>`
     );
 
     const response = await fetch("https://api.brevo.com/v3/smtp/email", {
@@ -238,7 +245,7 @@ export async function sendOrderConfirmationEmail(orderId: string): Promise<boole
       body: JSON.stringify({
         sender: SENDER,
         to: [{ email: recipient }],
-        subject: `Order confirmed - ${o.order_number}`,
+        subject: `Your Arade order ${o.order_number} - view your order details`,
         htmlContent,
       }),
     });
