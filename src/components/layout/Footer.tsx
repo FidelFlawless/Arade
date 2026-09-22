@@ -113,7 +113,13 @@ export default function Footer() {
               &copy; {new Date().getFullYear()} {SITE_NAME}. All rights reserved.
             </p>
             <div className="flex items-center gap-5">
-              <a href="#" className="text-white/40 hover:text-white transition-colors" aria-label="Facebook">
+              <a
+                href="https://www.facebook.com/share/19jp5aRwS1/?mibextid=wwXIfr"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-white/40 hover:text-white transition-colors"
+                aria-label="Facebook"
+              >
                 <Facebook className="w-6 h-6" aria-hidden="true" />
               </a>
               <a
