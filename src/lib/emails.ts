@@ -75,6 +75,7 @@ function emailShell(title: string, bodyHtml: string): string {
 
 interface OrderRow {
   id: string;
+  user_id: string;
   order_number: string;
   subtotal: number | string;
   delivery_fee: number | string;
@@ -84,20 +85,19 @@ interface OrderRow {
   created_at: string;
   shipping_first_name: string;
   shipping_last_name: string;
-  shipping_email: string;
   shipping_address_line1: string;
   shipping_address_line2: string | null;
   shipping_city: string;
-  shipping_province_state: string;
+  shipping_state_province: string;
   shipping_postal_code: string;
   shipping_country: string;
 }
 
 interface OrderItemRow {
   product_name: string;
-  product_image: string | null;
+  unit_price: number | string;
   quantity: number;
-  total: number | string;
+  subtotal: number | string;
 }
 
 /**
@@ -129,7 +129,7 @@ export async function sendOrderConfirmationEmail(orderId: string): Promise<boole
 
     const { data: items, error: itemsError } = await supabaseAdmin
       .from("order_items")
-      .select("product_name, product_image, quantity, total")
+      .select("product_name, unit_price, quantity, subtotal")
       .eq("order_id", orderId);
 
     if (itemsError || !items || items.length === 0) {
@@ -137,9 +137,17 @@ export async function sendOrderConfirmationEmail(orderId: string): Promise<boole
       return false;
     }
 
-    const recipient = o.shipping_email;
+    // The orders table has no email column - the recipient is the
+    // account email on the user's profile.
+    const { data: profile } = await supabaseAdmin
+      .from("profiles")
+      .select("email")
+      .eq("id", (order as OrderRow).user_id)
+      .single();
+
+    const recipient = profile?.email;
     if (!recipient) {
-      console.error("Order confirmation email: no recipient email on order", orderId);
+      console.error("Order confirmation email: no account email for user", (order as OrderRow).user_id);
       return false;
     }
 
@@ -149,20 +157,11 @@ export async function sendOrderConfirmationEmail(orderId: string): Promise<boole
         (item) => `
         <tr>
           <td style="padding: 12px 0; border-bottom: 1px solid #f0ece4;">
-            <div style="display: flex; align-items: center; gap: 12px;">
-              ${
-                item.product_image
-                  ? `<img src="${esc(item.product_image)}" alt="${esc(item.product_name)}" style="width: 60px; height: 60px; object-fit: cover; border-radius: 8px;" />`
-                  : ""
-              }
-              <div>
-                <p style="margin: 0; font-weight: 600; color: #1a1a2e; font-size: 14px;">${esc(item.product_name)}</p>
-                <p style="margin: 4px 0 0; color: #666; font-size: 13px;">Qty: ${esc(item.quantity)}</p>
-              </div>
-            </div>
+            <div style="font-weight: 600; color: #1a1a2e; font-size: 14px;">${esc(item.product_name)}</div>
+            <div style="color: #666; font-size: 13px; margin-top: 4px;">${money(item.unit_price, o.currency)} &times; ${esc(item.quantity)}</div>
           </td>
           <td style="padding: 12px 0; border-bottom: 1px solid #f0ece4; text-align: right; font-weight: 600; color: #8B5E3C;">
-            ${money(item.total, o.currency)}
+            ${money(item.subtotal, o.currency)}
           </td>
         </tr>`
       )
@@ -172,7 +171,7 @@ export async function sendOrderConfirmationEmail(orderId: string): Promise<boole
       <p style="margin: 0; color: #333; font-size: 14px; line-height: 1.7;">
         ${esc(o.shipping_first_name)} ${esc(o.shipping_last_name)}<br />
         ${esc(o.shipping_address_line1)}${o.shipping_address_line2 ? `<br />${esc(o.shipping_address_line2)}` : ""}<br />
-        ${esc(o.shipping_city)}, ${esc(o.shipping_province_state)} ${esc(o.shipping_postal_code)}<br />
+        ${esc(o.shipping_city)}, ${esc(o.shipping_state_province)} ${esc(o.shipping_postal_code)}<br />
         ${o.shipping_country === "CA" ? "Canada" : "United States"}
       </p>`;
 
