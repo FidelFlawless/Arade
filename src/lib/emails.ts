@@ -56,6 +56,7 @@ function emailShell(title: string, bodyHtml: string): string {
   <body style="margin: 0; padding: 0; background-color: #faf8f5; font-family: 'Helvetica Neue', Arial, sans-serif;">
     <div style="max-width: 560px; margin: 0 auto; padding: 40px 20px;">
       <div style="text-align: center; margin-bottom: 32px;">
+        <img src="${SITE_URL}/logo.webp" alt="Arade" width="72" height="72" style="display: block; margin: 0 auto 12px; border-radius: 16px;" />
         <h1 style="font-size: 24px; color: #1a1a2e; margin: 0 0 8px; font-weight: 700;">Arade</h1>
         <p style="color: #8B5E3C; font-size: 13px; letter-spacing: 2px; margin: 0; text-transform: uppercase;">Beauty &middot; Skincare &middot; Hair &middot; Fashion</p>
       </div>
