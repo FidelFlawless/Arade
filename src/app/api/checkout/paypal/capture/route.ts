@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { sendOrderConfirmationEmail } from "@/lib/emails";
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -203,6 +204,11 @@ export async function POST(req: NextRequest) {
     }
 
     console.log(`Order ${order.id} marked as PAID via PayPal (${paypalOrderId})`);
+
+    // Send the order confirmation email (fire-and-forget; never blocks checkout)
+    sendOrderConfirmationEmail(order.id).then((sent) => {
+      if (!sent) console.error(`Confirmation email failed for order ${order.id}`);
+    });
 
     return NextResponse.json({
       success: true,

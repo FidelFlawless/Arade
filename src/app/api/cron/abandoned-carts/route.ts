@@ -87,7 +87,7 @@ async function sendAbandonedCartEmail(
         "api-key": BREVO_API_KEY,
       },
       body: JSON.stringify({
-        sender: { name: "Arade", email: "Fideliarufus35@gmail.com" },
+        sender: { name: "Arade", email: "hello@aradeshop.com" },
         to: [{ email }],
         subject: "You left items in your cart",
         htmlContent,

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 import { createClient } from "@supabase/supabase-js";
+import { sendOrderConfirmationEmail } from "@/lib/emails";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
@@ -83,6 +84,11 @@ export async function POST(req: NextRequest) {
     }
 
     console.log(`Order ${orderId} marked as PAID via webhook`);
+
+    // Send the order confirmation email (fire-and-forget; never blocks the webhook)
+    sendOrderConfirmationEmail(orderId).then((sent) => {
+      if (!sent) console.error(`Confirmation email failed for order ${orderId}`);
+    });
   }
 
   // Handle payment_intent.payment_failed
