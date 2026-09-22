@@ -278,7 +278,10 @@ export async function POST(req: NextRequest) {
         landing_page: "BILLING",
         shipping_preference: "SET_PROVIDED_ADDRESS",
         user_action: "PAY_NOW",
-        return_url: `${baseUrl}/order/success?paypal_order_id=REPLACE`,
+        // Used when PayPal falls back to a full-page redirect (mobile
+        // browsers with blocked popups). The success page captures the
+        // payment on landing via /api/checkout/paypal/capture.
+        return_url: `${baseUrl}/order/success`,
         cancel_url: `${baseUrl}/checkout?cancelled=true`,
       },
     };

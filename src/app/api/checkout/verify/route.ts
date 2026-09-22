@@ -50,7 +50,15 @@ export async function GET(req: NextRequest) {
   }
 
   if (order.payment_status === "paid") {
-    return NextResponse.json({ success: true, order });
+    // Supabase returns NUMERIC columns as strings - coerce before the
+    // client calls .toFixed(2) on them
+    return NextResponse.json({
+      success: true,
+      order: {
+        ...order,
+        total: Number(order.total),
+      },
+    });
   }
 
   // Still pending — capture may not have fired yet

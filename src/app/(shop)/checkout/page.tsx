@@ -298,7 +298,7 @@ export default function CheckoutPage() {
     }
 
     const script = document.createElement("script");
-    script.src = `https://www.paypal.com/sdk/js?client-id=${PAYPAL_CLIENT_ID}&currency=${currency}`;
+    script.src = `https://www.paypal.com/sdk/js?client-id=${PAYPAL_CLIENT_ID}&currency=${currency}&intent=capture`;
     script.async = true;
     script.onload = () => {
       setPaypalScriptLoaded(true);
@@ -367,8 +367,9 @@ export default function CheckoutPage() {
       onError: (err: unknown) => {
         setLoading(false);
         console.error("PayPal SDK error:", err);
-        const msg = err && typeof err === "object" && "message" in err ? String((err as { message: unknown }).message) : String(err);
-        alert("PayPal error: " + msg);
+        alert(
+          "PayPal could not open. Please check your internet connection, make sure cookies are allowed in your browser, and try again. You can also pay with a card using the Card option."
+        );
       },
       onCancel: () => {
         setLoading(false);

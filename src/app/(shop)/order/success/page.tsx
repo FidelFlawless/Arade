@@ -10,10 +10,13 @@ function OrderSuccessContent() {
   const searchParams = useSearchParams();
   const sessionId = searchParams.get("session_id");
   const paypalOrderId = searchParams.get("paypal_order_id");
+  // PayPal popup-blocked fallback: user lands back on the site from a
+  // full-page redirect with the order token instead of our param name.
+  const paypalToken = searchParams.get("token");
   const { clearCart } = useCart();
   const [order, setOrder] = useState<{
     order_number: string;
-    total: number;
+    total: number | string;
     currency: string;
   } | null>(null);
   const [loading, setLoading] = useState(true);
@@ -48,11 +51,13 @@ function OrderSuccessContent() {
       return () => clearTimeout(timer);
     }
 
-    if (paypalOrderId) {
-      // PayPal flow
+    if (paypalOrderId || paypalToken) {
+      // PayPal flow (popup flow passes paypal_order_id; the rare
+      // full-page-redirect fallback passes `token`)
+      const id = paypalOrderId || paypalToken;
       const checkPayPalOrder = async () => {
         try {
-          const res = await fetch(`/api/checkout/verify?paypal_order_id=${paypalOrderId}`);
+          const res = await fetch(`/api/checkout/verify?paypal_order_id=${id}`);
           const data = await res.json();
 
           if (data.success && data.order) {
@@ -70,13 +75,28 @@ function OrderSuccessContent() {
         }
       };
 
-      const timer = setTimeout(checkPayPalOrder, 1500);
+      // If the order isn't captured yet, the capture API is idempotent -
+      // calling it here completes the payment for redirect-flow users.
+      const captureAndCheck = async () => {
+        try {
+          await fetch("/api/checkout/paypal/capture", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ paypalOrderId: id }),
+          });
+        } catch {
+          // Capture errors surface through the verify polling below
+        }
+        checkPayPalOrder();
+      };
+
+      const timer = setTimeout(captureAndCheck, 1500);
       return () => clearTimeout(timer);
     }
 
     // No params — show generic success
     setLoading(false);
-  }, [sessionId, paypalOrderId, clearCart]);
+  }, [sessionId, paypalOrderId, paypalToken, clearCart]);
 
   if (loading) {
     return (
@@ -130,7 +150,7 @@ function OrderSuccessContent() {
             <div className="flex justify-between text-sm">
               <span className="text-foreground/60">Total</span>
               <span className="font-semibold">
-                {order.currency === "CAD" ? "C$" : "US$"}{order.total.toFixed(2)}
+                {order.currency === "CAD" ? "C$" : "US$"}{Number(order.total).toFixed(2)}
               </span>
             </div>
           </div>
