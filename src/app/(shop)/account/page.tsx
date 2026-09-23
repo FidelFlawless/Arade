@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/components/providers/AuthProvider";
-import { User, Package, MapPin, LogOut, Loader2, ArrowLeft, Lock, Trash2, Eye, EyeOff } from "lucide-react";
+import { User, Package, MapPin, LogOut, Loader2, Lock, Trash2, Eye, EyeOff } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { isValidNorthAmericanPhone } from "@/lib/utils";
 import BackButton from "@/components/ui/BackButton";

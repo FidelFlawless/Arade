@@ -108,7 +108,7 @@ export default function OrdersPage() {
               className="card flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between hover:border-primary transition-colors"
             >
               <Link href={`/order/${order.order_number}`} className="flex min-w-0 flex-1 items-center gap-4">
-                <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center overflow-hidden flex-shrink-0">
+                <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center overflow-hidden shrink-0">
                   {order.order_items?.[0]?.products?.images?.[0] ? (
                     <img
                       src={order.order_items[0].products.images[0]}
@@ -120,7 +120,7 @@ export default function OrdersPage() {
                   )}
                 </div>
                 <div className="min-w-0">
-                  <p className="font-medium text-foreground break-words">
+                  <p className="font-medium text-foreground wrap-break-word">
                     Order {order.order_number}
                   </p>
                   <p className="text-sm text-foreground/50">

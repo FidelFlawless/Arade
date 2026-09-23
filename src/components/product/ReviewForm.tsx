@@ -10,7 +10,7 @@ interface ReviewFormProps {
   productName: string;
 }
 
-export default function ReviewForm({ productId, productName }: ReviewFormProps) {
+export default function ReviewForm({ productId }: ReviewFormProps) {
   const { user, loading: authLoading } = useAuth();
   const [rating, setRating] = useState(0);
   const [hoveredRating, setHoveredRating] = useState(0);

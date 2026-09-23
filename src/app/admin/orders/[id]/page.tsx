@@ -75,7 +75,7 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
           delivery_fee: Number(data.delivery_fee ?? 0),
           discount: Number(data.discount ?? 0),
           total: Number(data.total ?? 0),
-          order_items: (data.order_items ?? []).map((item: any) => ({
+          order_items: ((data.order_items ?? []) as Record<string, unknown>[]).map((item) => ({
             ...item,
             quantity: Number(item.quantity ?? 0),
             unit_price: Number(item.unit_price ?? 0),

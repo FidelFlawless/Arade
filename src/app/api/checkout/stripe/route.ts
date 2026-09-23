@@ -258,7 +258,7 @@ export async function POST(req: NextRequest) {
 
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
-      payment_method_types: ["card"],
+      ...({ managed_payments: { enabled: false } } as Record<string, unknown>),
       customer_email: shippingAddress.email || undefined,
       line_items: lineItems,
       shipping_address_collection: {

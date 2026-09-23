@@ -65,7 +65,7 @@ export async function POST(req: NextRequest) {
       stripe_payment_intent_id: session.payment_intent as string,
       amount: (session.amount_total || 0) / 100,
       currency: session.currency?.toUpperCase() || "CAD",
-      status: "succeeded",
+      status: "paid",
     });
 
     // Decrement stock for each order item
