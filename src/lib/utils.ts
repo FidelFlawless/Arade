@@ -1,6 +1,12 @@
 import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
-import { FREE_DELIVERY_THRESHOLD, DELIVERY_FEE_CAD, DELIVERY_FEE_USD } from "@/lib/constants";
+import {
+  CANADIAN_PROVINCES,
+  DELIVERY_FEE_CAD,
+  DELIVERY_FEE_USD,
+  FREE_DELIVERY_THRESHOLD,
+  US_STATES,
+} from "@/lib/constants";
 
 // Merge Tailwind classes safely
 export function cn(...inputs: ClassValue[]) {
@@ -86,6 +92,15 @@ export function isValidCanadianPostalCode(code: string): boolean {
 export function isValidUSZipCode(code: string): boolean {
   const regex = /^\d{5}(-\d{4})?$/;
   return regex.test(code);
+}
+
+export function isValidShippingPostalCode(country: "CA" | "US", code: string): boolean {
+  return country === "CA" ? isValidCanadianPostalCode(code.trim()) : isValidUSZipCode(code.trim());
+}
+
+export function isValidShippingRegion(country: "CA" | "US", region: string): boolean {
+  const regions = country === "CA" ? CANADIAN_PROVINCES : US_STATES;
+  return regions.some(({ code }) => code === region);
 }
 
 // Canada and the United States use the North American Numbering Plan.

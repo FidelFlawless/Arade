@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useAuth } from "@/components/providers/AuthProvider";
 import { createClient } from "@/lib/supabase/client";
-import { Package, Loader2, ChevronRight, XCircle } from "lucide-react";
+import { Package, Loader2, ChevronRight } from "lucide-react";
 import BackButton from "@/components/ui/BackButton";
 
 interface OrderRow {
@@ -31,9 +31,7 @@ export default function OrdersPage() {
   const { user, loading: authLoading } = useAuth();
   const [orders, setOrders] = useState<OrderRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [cancelling, setCancelling] = useState<string | null>(null);
-  const [error, setError] = useState("");
-  const supabase = createClient();
+  const supabase = useRef(createClient()).current;
 
   useEffect(() => {
     if (!user) {
@@ -46,6 +44,7 @@ export default function OrdersPage() {
         .from("orders")
         .select("*, order_items(id, products(name, images))")
         .eq("user_id", user.id)
+        .eq("payment_status", "paid")
         .order("created_at", { ascending: false });
 
       if (!error && data) {
@@ -56,20 +55,6 @@ export default function OrdersPage() {
 
     fetchOrders();
   }, [user, supabase]);
-
-  const cancelOrder = async (orderId: string) => {
-    if (!window.confirm("Cancel this pending order?")) return;
-    setCancelling(orderId);
-    setError("");
-    const response = await fetch(`/api/account/orders/${orderId}/cancel`, { method: "POST" });
-    const data = await response.json();
-    setCancelling(null);
-    if (!response.ok) {
-      setError(data.error || "Unable to cancel order.");
-      return;
-    }
-    setOrders((current) => current.map((order) => order.id === orderId ? { ...order, order_status: "cancelled" } : order));
-  };
 
   if (authLoading || loading) {
     return (
@@ -102,8 +87,6 @@ export default function OrdersPage() {
       <BackButton />
       <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-foreground mb-6 sm:mb-8">My Orders</h1>
 
-      {error && <div className="mb-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" role="status">{error}</div>}
-
       {orders.length === 0 ? (
         <div className="text-center py-16">
           <Package className="w-16 h-16 text-foreground/20 mx-auto mb-4" />
@@ -122,7 +105,7 @@ export default function OrdersPage() {
           {orders.map((order) => (
             <div
               key={order.id}
-              className="card flex items-center justify-between gap-4 hover:border-primary transition-colors"
+              className="card flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between hover:border-primary transition-colors"
             >
               <Link href={`/order/${order.order_number}`} className="flex min-w-0 flex-1 items-center gap-4">
                 <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center overflow-hidden flex-shrink-0">
@@ -136,8 +119,8 @@ export default function OrdersPage() {
                     <Package className="w-6 h-6 text-primary" />
                   )}
                 </div>
-                <div>
-                  <p className="font-medium text-foreground">
+                <div className="min-w-0">
+                  <p className="font-medium text-foreground break-words">
                     Order {order.order_number}
                   </p>
                   <p className="text-sm text-foreground/50">
@@ -151,11 +134,11 @@ export default function OrdersPage() {
                   </p>
                 </div>
               </Link>
-              <div className="flex items-center gap-4">
-                <div className="text-right">
+              <div className="flex items-center justify-between gap-3 sm:justify-end">
+                <div className="text-left sm:text-right">
                   <p className="font-semibold text-foreground">
                     {order.currency === "CAD" ? "C$" : "US$"}
-                    {order.total.toFixed(2)}
+                    {Number(order.total ?? 0).toFixed(2)}
                   </p>
                   <span
                     className={`inline-block mt-1 px-2 py-0.5 rounded-full text-xs font-medium ${
@@ -166,14 +149,8 @@ export default function OrdersPage() {
                       (order.order_status || order.status || "pending").slice(1)}
                   </span>
                 </div>
-                <ChevronRight className="w-5 h-5 text-foreground/30" />
+                <ChevronRight className="w-5 h-5 text-foreground/30 hidden sm:block" />
               </div>
-              {(order.order_status || order.status || "pending") === "pending" && (
-                <button type="button" onClick={() => cancelOrder(order.id)} disabled={cancelling === order.id} className="inline-flex items-center gap-1 text-xs font-medium text-red-600 hover:text-red-700 disabled:opacity-50">
-                  <XCircle className="w-4 h-4" />
-                  {cancelling === order.id ? "Cancelling..." : "Cancel"}
-                </button>
-              )}
             </div>
           ))}
         </div>

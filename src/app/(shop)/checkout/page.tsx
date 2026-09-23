@@ -8,7 +8,13 @@ import BackButton from "@/components/ui/BackButton";
 import { useCart } from "@/components/providers/CartProvider";
 import { useAuth } from "@/components/providers/AuthProvider";
 import { createClient } from "@/lib/supabase/client";
-import { formatPrice, isValidNorthAmericanPhone } from "@/lib/utils";
+import {
+  formatPrice,
+  isValidEmail,
+  isValidNorthAmericanPhone,
+  isValidShippingPostalCode,
+  isValidShippingRegion,
+} from "@/lib/utils";
 import { CANADIAN_PROVINCES, US_STATES } from "@/lib/constants";
 
 interface ShippingForm {
@@ -63,22 +69,27 @@ export default function CheckoutPage() {
   const router = useRouter();
   const { user, profile, loading: authLoading } = useAuth();
   const { items: cartItems } = useCart();
-  const supabase = createClient();
+  const supabase = useRef(createClient()).current;
   const [loading, setLoading] = useState(false);
+  const [paymentError, setPaymentError] = useState("");
   const [, setSavedAddresses] = useState<SavedAddress[]>([]);
   const [, setLoadingAddresses] = useState(true);
   const [errors, setErrors] = useState<Partial<Record<keyof ShippingForm, string>>>({});
   const [paymentMethod, setPaymentMethod] = useState<"stripe" | "paypal">("stripe");
   const paypalButtonsRef = useRef<HTMLDivElement>(null);
   const paypalButtonsRendered = useRef(false);
-  const [paypalLoaded, setPaypalLoaded] = useState(false);
   const [paypalScriptLoaded, setPaypalScriptLoaded] = useState(false);
 
   useEffect(() => { if (!authLoading && !user) router.push("/auth/login?redirect=/checkout"); }, [user, authLoading, router]);
 
   useEffect(() => {
     if (user) {
-      setForm(prev => ({ ...prev, email: user.email || "", first_name: profile?.first_name || "", last_name: profile?.last_name || "" }));
+      setForm(prev => ({
+        ...prev,
+        email: prev.email || user.email || "",
+        first_name: prev.first_name || profile?.first_name || "",
+        last_name: prev.last_name || profile?.last_name || "",
+      }));
       const loadAddresses = async () => {
         setLoadingAddresses(true);
         const res = await fetch("/api/addresses");
@@ -86,7 +97,17 @@ export default function CheckoutPage() {
         setSavedAddresses(data || []);
         setLoadingAddresses(false);
         const def = data?.find((a: SavedAddress) => a.is_default) || data?.[0];
-        if (def) setForm(prev => ({ ...prev, first_name: def.first_name || prev.first_name, last_name: def.last_name || prev.last_name, address_line1: def.address_line1 || "", address_line2: def.address_line2 || "", city: def.city || "", province_state: def.province_state || "", postal_code: def.postal_code || "", country: def.country || "CA" }));
+        if (def) setForm(prev => ({
+          ...prev,
+          first_name: prev.first_name || def.first_name || "",
+          last_name: prev.last_name || def.last_name || "",
+          address_line1: prev.address_line1 || def.address_line1 || "",
+          address_line2: prev.address_line2 || def.address_line2 || "",
+          city: prev.city || def.city || "",
+          province_state: prev.province_state || def.province_state || "",
+          postal_code: prev.postal_code || def.postal_code || "",
+          country: def.country === "US" ? "US" : def.country === "CA" ? "CA" : prev.country,
+        }));
       };
       loadAddresses();
     }
@@ -130,12 +151,16 @@ export default function CheckoutPage() {
     if (!form.first_name.trim()) newErrors.first_name = "First name is required";
     if (!form.last_name.trim()) newErrors.last_name = "Last name is required";
     if (!form.email.trim()) newErrors.email = "Email is required";
-    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email))
+    else if (!isValidEmail(form.email))
       newErrors.email = "Invalid email address";
     if (!form.address_line1.trim()) newErrors.address_line1 = "Address is required";
     if (!form.city.trim()) newErrors.city = "City is required";
     if (!form.province_state) newErrors.province_state = "Province/State is required";
+    else if (!isValidShippingRegion(form.country, form.province_state))
+      newErrors.province_state = "Select a valid province or state";
     if (!form.postal_code.trim()) newErrors.postal_code = "Postal/ZIP code is required";
+    else if (!isValidShippingPostalCode(form.country, form.postal_code))
+      newErrors.postal_code = form.country === "CA" ? "Enter a valid Canadian postal code" : "Enter a valid US ZIP code";
     if (!form.phone.trim()) newErrors.phone = "Phone number is required";
     else if (!isValidNorthAmericanPhone(form.phone)) {
       newErrors.phone = "Enter a valid Canada or United States phone number";
@@ -148,7 +173,7 @@ export default function CheckoutPage() {
   const isFormValid = (errs: Partial<Record<keyof ShippingForm, string>>) =>
     Object.keys(errs).length === 0;
 
-  const buildShippingAddress = () => ({
+  const buildShippingAddress = useCallback(() => ({
     first_name: form.first_name,
     last_name: form.last_name,
     email: form.email,
@@ -158,16 +183,17 @@ export default function CheckoutPage() {
     city: form.city,
     province_state: form.province_state,
     postal_code: form.postal_code,
-  });
+  }), [form]);
 
-  const buildItems = () =>
+  const buildItems = useCallback(() =>
     cartItems.map((item) => ({
       productId: item.id,
       quantity: item.quantity,
-    }));
+    })), [cartItems]);
 
   // ─── Step 1 -> Step 2: Validate shipping and continue to payment ──
   const handleContinueToPayment = () => {
+    setPaymentError("");
     const errs = validateForm();
     if (isFormValid(errs)) {
       setCheckoutStep("payment");
@@ -193,6 +219,7 @@ export default function CheckoutPage() {
     if (!user) return;
 
     setLoading(true);
+    setPaymentError("");
     try {
       const { data: sessionData } = await supabase.auth.getSession();
       const token = sessionData?.session?.access_token || undefined;
@@ -217,18 +244,17 @@ export default function CheckoutPage() {
       if (data.success && data.url) {
         window.location.href = data.url;
       } else {
-        alert(data.details ? `${data.error}: ${data.details}` : data.error || "Failed to start checkout. Please try again.");
+        setPaymentError(data.details ? `${data.error}: ${data.details}` : data.error || "Failed to start checkout. Please try again.");
         setLoading(false);
       }
     } catch {
-      alert("An error occurred. Please try again.");
+      setPaymentError("Unable to start checkout. Please check your connection and try again.");
       setLoading(false);
     }
-  }, [user, form, currency, cartItems, supabase]);
+  }, [user, form.country, currency, buildItems, buildShippingAddress, supabase]);
 
   // ─── PayPal checkout ─────────────────────────────────────────
   const handleCreatePayPalOrder = useCallback(async () => {
-    const errs = validateForm(); if (!isFormValid(errs)) throw new Error("validation_failed");
     if (!user) throw new Error("not_authenticated");
 
     const { data: sessionData } = await supabase.auth.getSession();
@@ -260,7 +286,7 @@ export default function CheckoutPage() {
     sessionStorage.setItem("paypal_order_number", data.orderNumber);
 
     return data.paypalOrderId;
-  }, [user, form, currency, cartItems, supabase]);
+  }, [user, form.country, currency, buildItems, buildShippingAddress, supabase]);
 
   const handlePayPalApprove = useCallback(async (data: { orderID: string }) => {
     const res = await fetch("/api/checkout/paypal/capture", {
@@ -276,13 +302,7 @@ export default function CheckoutPage() {
       sessionStorage.removeItem("paypal_order_id");
       sessionStorage.removeItem("paypal_order_number");
 
-      if (result.alreadyCaptured) {
-        // Already captured, just go to success
-        const orderNumber = sessionStorage.getItem("paypal_order_number");
-        window.location.href = `/order/success?paypal_order_id=${data.orderID}`;
-      } else {
-        window.location.href = `/order/success?paypal_order_id=${data.orderID}`;
-      }
+      window.location.href = `/order/success?paypal_order_id=${data.orderID}`;
     } else {
       throw new Error(result.error || "Payment capture failed");
     }
@@ -326,7 +346,6 @@ export default function CheckoutPage() {
     }
 
     paypalButtonsRendered.current = true;
-    setPaypalLoaded(true);
 
     window.paypal.Buttons({
       style: {
@@ -339,6 +358,7 @@ export default function CheckoutPage() {
       createOrder: async () => {
         try {
           setLoading(true);
+          setPaymentError("");
           const orderId = await handleCreatePayPalOrder();
           setLoading(false);
           return orderId;
@@ -346,11 +366,7 @@ export default function CheckoutPage() {
           setLoading(false);
           console.error("PayPal createOrder error:", err);
           const msg = err instanceof Error ? err.message : "Unknown error";
-          if (msg === "validation_failed") {
-            alert("Please fill in all required shipping fields.");
-            return;
-          }
-          alert("Failed to start PayPal checkout: " + msg);
+          setPaymentError("Failed to start PayPal checkout: " + msg);
           throw err;
         }
       },
@@ -361,15 +377,13 @@ export default function CheckoutPage() {
         } catch (err) {
           setLoading(false);
           console.error("PayPal capture error:", err);
-          alert("Payment failed. Please try again.");
+          setPaymentError(err instanceof Error ? err.message : "Payment failed. Please try again.");
         }
       },
       onError: (err: unknown) => {
         setLoading(false);
         console.error("PayPal SDK error:", err);
-        alert(
-          "PayPal could not open. Please check your internet connection, make sure cookies are allowed in your browser, and try again. You can also pay with a card using the Card option."
-        );
+        setPaymentError("PayPal could not open. Check your connection and cookies, or choose card payment.");
       },
       onCancel: () => {
         setLoading(false);
@@ -381,7 +395,6 @@ export default function CheckoutPage() {
   useEffect(() => {
     if (paymentMethod !== "paypal") {
       paypalButtonsRendered.current = false;
-      setPaypalLoaded(false);
       if (paypalButtonsRef.current) {
         paypalButtonsRef.current.innerHTML = "";
       }
@@ -390,6 +403,7 @@ export default function CheckoutPage() {
 
   const updateForm = (field: keyof ShippingForm, value: string) => {
     setForm((prev) => ({ ...prev, [field]: value }));
+    setPaymentError("");
     if (errors[field]) {
       setErrors((prev) => ({ ...prev, [field]: undefined }));
     }
@@ -435,10 +449,12 @@ export default function CheckoutPage() {
                   </label>
                   <select
                     value={form.country}
-                    onChange={(e) =>
-                      updateForm("country", e.target.value)
-                    }
+                    onChange={(e) => {
+                      updateForm("country", e.target.value);
+                      updateForm("province_state", "");
+                    }}
                     className="input"
+                    required
                   >
                     <option value="CA">Canada</option>
                     <option value="US">United States</option>
@@ -458,6 +474,8 @@ export default function CheckoutPage() {
                       className={`input ${errors.first_name ? "input-error" : ""}`}
                       placeholder="John"
                       id="checkout-first_name"
+                      autoComplete="given-name"
+                      required
                     />
                     {errors.first_name && (
                       <p className="text-xs text-red-600 mt-1">{errors.first_name}</p>
@@ -474,6 +492,8 @@ export default function CheckoutPage() {
                       className={`input ${errors.last_name ? "input-error" : ""}`}
                       placeholder="Doe"
                       id="checkout-last_name"
+                      autoComplete="family-name"
+                      required
                     />
                     {errors.last_name && (
                       <p className="text-xs text-red-600 mt-1">{errors.last_name}</p>
@@ -495,6 +515,8 @@ export default function CheckoutPage() {
                       className={`input ${errors.email ? "input-error" : ""}`}
                       placeholder="john@example.com"
                       id="checkout-email"
+                      autoComplete="email"
+                      required
                     />
                     {errors.email && (
                       <p className="text-xs text-red-600 mt-1">{errors.email}</p>
@@ -511,6 +533,9 @@ export default function CheckoutPage() {
                       className={`input ${errors.phone ? "border-red-500" : ""}`}
                       placeholder="+1 (555) 123-4567"
                       id="checkout-phone"
+                      autoComplete="tel"
+                      inputMode="tel"
+                      required
                     />
                     {errors.phone && <p className="text-xs text-red-600 mt-1">{errors.phone}</p>}
                   </div>
@@ -525,8 +550,11 @@ export default function CheckoutPage() {
                     type="text"
                     value={form.address_line1}
                     onChange={(e) => updateForm("address_line1", e.target.value)}
-                    className={`input ${errors.address_line1 ? "input-error" : ""}`}                      placeholder="123 Main Street"
+                    className={`input ${errors.address_line1 ? "input-error" : ""}`}
+                    placeholder="123 Main Street"
                       id="checkout-address_line1"
+                      autoComplete="address-line1"
+                      required
                     />
                     {errors.address_line1 && (
                       <p className="text-xs text-red-600 mt-1">{errors.address_line1}</p>
@@ -543,6 +571,7 @@ export default function CheckoutPage() {
                     onChange={(e) => updateForm("address_line2", e.target.value)}
                     className="input"
                     placeholder="Apt 4B"
+                    autoComplete="address-line2"
                   />
                 </div>
 
@@ -559,6 +588,8 @@ export default function CheckoutPage() {
                       className={`input ${errors.city ? "input-error" : ""}`}
                       placeholder="Toronto"
                       id="checkout-city"
+                      autoComplete="address-level2"
+                      required
                     />
                     {errors.city && (
                       <p className="text-xs text-red-600 mt-1">{errors.city}</p>
@@ -573,6 +604,8 @@ export default function CheckoutPage() {
                       onChange={(e) => updateForm("province_state", e.target.value)}
                       className={`input ${errors.province_state ? "input-error" : ""}`}
                       id="checkout-province_state"
+                      autoComplete="address-level1"
+                      required
                     >
                       <option value="">Select...</option>
                       {provinces.map((p) => (
@@ -596,6 +629,9 @@ export default function CheckoutPage() {
                       className={`input ${errors.postal_code ? "input-error" : ""}`}
                       placeholder={form.country === "CA" ? "A1A 1A1" : "12345"}
                       id="checkout-postal_code"
+                      autoComplete="postal-code"
+                      inputMode={form.country === "CA" ? "text" : "numeric"}
+                      required
                     />
                     {errors.postal_code && (
                       <p className="text-xs text-red-600 mt-1">{errors.postal_code}</p>
@@ -629,7 +665,10 @@ export default function CheckoutPage() {
                   </div>
                   <button
                     type="button"
-                    onClick={() => setCheckoutStep("shipping")}
+                    onClick={() => {
+                      setPaymentError("");
+                      setCheckoutStep("shipping");
+                    }}
                     className="text-sm text-primary hover:underline font-medium"
                   >
                     Edit
@@ -644,6 +683,12 @@ export default function CheckoutPage() {
               </h2>
 
               <div className="space-y-3">
+              {paymentError && (
+                <div role="alert" className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                  {paymentError}
+                </div>
+              )}
+
                 {/* Stripe option */}
                 <label
                   className={`flex items-center gap-3 p-4 border-2 rounded-lg cursor-pointer transition-colors ${
@@ -658,6 +703,7 @@ export default function CheckoutPage() {
                     value="stripe"
                     checked={paymentMethod === "stripe"}
                     onChange={() => setPaymentMethod("stripe")}
+                    disabled={loading}
                     className="w-4 h-4 text-primary"
                   />
                   <CreditCard className="w-5 h-5 text-foreground/60" />
@@ -681,6 +727,7 @@ export default function CheckoutPage() {
                     value="paypal"
                     checked={paymentMethod === "paypal"}
                     onChange={() => setPaymentMethod("paypal")}
+                    disabled={loading}
                     className="w-4 h-4 text-primary"
                   />
                   <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none">
@@ -726,7 +773,7 @@ export default function CheckoutPage() {
                       Loading PayPal...
                     </div>
                   )}
-                  <div ref={paypalButtonsRef} />
+                  <div className={loading ? "pointer-events-none opacity-60" : ""} ref={paypalButtonsRef} />
                 </div>
               )}
             </div>

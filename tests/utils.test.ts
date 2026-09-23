@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   calculateDeliveryFee,
   formatPrice,
+  isValidShippingPostalCode,
+  isValidShippingRegion,
   isValidNorthAmericanPhone,
   safeInternalRedirect,
 } from "@/lib/utils";
@@ -16,6 +18,20 @@ describe("Arade utility rules", () => {
     expect(isValidNorthAmericanPhone("12345")).toBe(false);
     expect(isValidNorthAmericanPhone("+44 20 7946 0958")).toBe(false);
     expect(isValidNorthAmericanPhone("+1 (011) 555-0123")).toBe(false);
+  });
+
+  it("validates postal codes for the selected country", () => {
+    expect(isValidShippingPostalCode("CA", "A1A 1A1")).toBe(true);
+    expect(isValidShippingPostalCode("CA", "12345")).toBe(false);
+    expect(isValidShippingPostalCode("US", "12345-6789")).toBe(true);
+    expect(isValidShippingPostalCode("US", "A1A 1A1")).toBe(false);
+  });
+
+  it("validates that the region belongs to the selected country", () => {
+    expect(isValidShippingRegion("CA", "ON")).toBe(true);
+    expect(isValidShippingRegion("CA", "NY")).toBe(false);
+    expect(isValidShippingRegion("US", "NY")).toBe(true);
+    expect(isValidShippingRegion("US", "ON")).toBe(false);
   });
 
   it("calculates delivery fees at the configured threshold", () => {

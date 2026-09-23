@@ -48,11 +48,20 @@ export async function POST(req: NextRequest) {
     // 1. Check for duplicate capture (idempotency)
     const { data: existingPayment } = await supabaseAdmin
       .from("payments")
-      .select("id, status")
+      .select("id, status, order_id")
       .eq("paypal_order_id", paypalOrderId)
       .single();
 
-    if (existingPayment && existingPayment.status === "succeeded") {
+    if (existingPayment && existingPayment.status === "paid") {
+      const { error: existingOrderError } = await supabaseAdmin
+        .from("orders")
+        .update({ payment_status: "paid", order_status: "processing" })
+        .eq("id", existingPayment.order_id)
+        .neq("payment_status", "paid");
+      if (existingOrderError) {
+        console.error("Failed to reconcile already-recorded PayPal payment:", existingOrderError);
+        return NextResponse.json({ error: "Unable to finalize PayPal payment" }, { status: 500 });
+      }
       return NextResponse.json({ success: true, alreadyCaptured: true });
     }
 
@@ -71,6 +80,15 @@ export async function POST(req: NextRequest) {
       }
     );
 
+    let captureData: {
+      status?: string;
+      purchase_units?: Array<{
+        reference_id?: string;
+        custom_id?: string;
+        payments?: { captures?: Array<{ id?: string; amount?: { value?: string; currency_code?: string } }> };
+      }>;
+    };
+
     if (!captureResponse.ok) {
       const errorData = await captureResponse.json().catch(() => ({}));
       console.error("PayPal capture error:", errorData);
@@ -82,17 +100,29 @@ export async function POST(req: NextRequest) {
           (d: { issue?: string }) => d.issue === "ORDER_ALREADY_CAPTURED"
         );
         if (alreadyCaptured) {
-          return NextResponse.json({ success: true, alreadyCaptured: true });
+          const orderResponse = await fetch(
+            `${PAYPAL_BASE}/v2/checkout/orders/${paypalOrderId}`,
+            { headers: { Authorization: `Bearer ${accessToken}` } }
+          );
+          if (!orderResponse.ok) {
+            return NextResponse.json({ error: "Unable to verify captured PayPal payment" }, { status: 502 });
+          }
+          captureData = await orderResponse.json();
+        } else {
+          return NextResponse.json(
+            { error: "Failed to capture PayPal payment" },
+            { status: 500 }
+          );
         }
+      } else {
+        return NextResponse.json(
+          { error: "Failed to capture PayPal payment" },
+          { status: 500 }
+        );
       }
-
-      return NextResponse.json(
-        { error: "Failed to capture PayPal payment" },
-        { status: 500 }
-      );
+    } else {
+      captureData = await captureResponse.json();
     }
-
-    const captureData = await captureResponse.json();
 
     // 3. Verify capture status
     const captureStatus = captureData.status;
@@ -148,12 +178,20 @@ export async function POST(req: NextRequest) {
     const capturedAmount = parseFloat(
       purchaseUnit?.payments?.captures?.[0]?.amount?.value || "0"
     );
+    const capturedCurrency = purchaseUnit?.payments?.captures?.[0]?.amount?.currency_code;
 
-    if (Math.abs(capturedAmount - order.total) > 0.01) {
+    if (
+      !Number.isFinite(capturedAmount) ||
+      Math.abs(capturedAmount - Number(order.total)) > 0.01 ||
+      capturedCurrency !== order.currency
+    ) {
       console.error(
-        `Amount mismatch: PayPal captured ${capturedAmount}, order total ${order.total}`
+        `PayPal payment mismatch: captured ${capturedAmount} ${capturedCurrency}, order total ${order.total} ${order.currency}`
       );
-      // Still proceed but log the discrepancy
+      return NextResponse.json(
+        { error: "PayPal payment amount does not match the order total" },
+        { status: 409 }
+      );
     }
 
     // 6. If already paid, don't process again (idempotency)
@@ -163,6 +201,50 @@ export async function POST(req: NextRequest) {
 
     // 7. Mark order as paid
     const captureId = purchaseUnit?.payments?.captures?.[0]?.id || "";
+
+    if (!captureId) {
+      console.error("PayPal capture response did not include a capture ID:", captureData);
+      return NextResponse.json({ error: "PayPal did not return a valid capture" }, { status: 502 });
+    }
+
+    const { data: orderItems, error: orderItemsError } = await supabaseAdmin
+      .from("order_items")
+      .select("product_id, quantity")
+      .eq("order_id", order.id);
+
+    if (orderItemsError || !orderItems?.length) {
+      console.error("Failed to load order items for PayPal payment:", orderItemsError);
+      return NextResponse.json({ error: "Unable to finalize PayPal payment" }, { status: 500 });
+    }
+
+    // Prefer the database transaction function so payment, order, and stock
+    // changes commit together. The fallback preserves compatibility until the
+    // migration is applied to an existing database.
+    const { error: transactionError } = await supabaseAdmin.rpc("finalize_paypal_payment" as never, {
+      p_order_id: order.id,
+      p_paypal_order_id: paypalOrderId,
+      p_capture_id: captureId,
+      p_amount: capturedAmount,
+      p_currency: order.currency,
+    } as never);
+
+    if (!transactionError) {
+      console.log(`Order ${order.id} marked as PAID via PayPal (${paypalOrderId})`);
+      sendOrderConfirmationEmail(order.id).then((sent) => {
+        if (!sent) console.error(`Confirmation email failed for order ${order.id}`);
+      });
+      return NextResponse.json({
+        success: true,
+        orderId: order.id,
+        orderNumber: order.order_number,
+        total: order.total,
+        currency: order.currency,
+      });
+    }
+
+    if (transactionError) {
+      console.error("PayPal transaction function unavailable or failed; using compatibility finalization:", transactionError);
+    }
 
     const { error: updateError } = await supabaseAdmin
       .from("orders")
@@ -179,27 +261,58 @@ export async function POST(req: NextRequest) {
     }
 
     // 8. Create payment record
-    await supabaseAdmin.from("payments").insert({
+    const paymentRecord = {
       order_id: order.id,
       provider: "paypal",
       paypal_order_id: paypalOrderId,
       amount: capturedAmount || order.total,
       currency: order.currency,
-      status: "succeeded",
-    });
+      status: "paid",
+    };
+
+    const { data: paymentByPayPalId } = await supabaseAdmin
+      .from("payments")
+      .select("id")
+      .eq("paypal_order_id", paypalOrderId)
+      .maybeSingle();
+
+    const paymentWrite = paymentByPayPalId
+      ? supabaseAdmin.from("payments").update(paymentRecord).eq("id", paymentByPayPalId.id)
+      : supabaseAdmin.from("payments").insert(paymentRecord);
+    const { error: paymentInsertError } = await paymentWrite;
+
+    if (paymentInsertError) {
+      console.error("Failed to record PayPal payment:", paymentInsertError);
+      await supabaseAdmin.from("orders").update({
+        payment_status: "pending",
+        payment_id: null,
+        order_status: "pending",
+      }).eq("id", order.id);
+      return NextResponse.json(
+        {
+          error: "Unable to record PayPal payment",
+          details: paymentInsertError.message,
+          code: paymentInsertError.code,
+        },
+        { status: 500 }
+      );
+    }
 
     // 9. Decrement stock for each order item
-    const { data: orderItems } = await supabaseAdmin
-      .from("order_items")
-      .select("product_id, quantity")
-      .eq("order_id", order.id);
-
-    if (orderItems) {
-      for (const item of orderItems) {
-        await supabaseAdmin.rpc("decrement_stock" as never, {
+    for (const item of orderItems) {
+      const { error: stockError } = await supabaseAdmin.rpc("decrement_stock" as never, {
           p_product_id: item.product_id,
           p_quantity: item.quantity,
         } as never);
+      if (stockError) {
+        console.error("Failed to decrement stock:", stockError);
+        await supabaseAdmin.from("orders").update({
+          payment_status: "pending",
+          payment_id: null,
+          order_status: "pending",
+        }).eq("id", order.id);
+        await supabaseAdmin.from("payments").delete().eq("paypal_order_id", paypalOrderId);
+        return NextResponse.json({ error: "Unable to reserve inventory for PayPal payment" }, { status: 500 });
       }
     }
 

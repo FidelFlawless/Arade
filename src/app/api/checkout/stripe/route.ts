@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 import { createClient } from "@supabase/supabase-js";
-import { isValidNorthAmericanPhone } from "@/lib/utils";
+import {
+  isValidEmail,
+  isValidNorthAmericanPhone,
+  isValidShippingPostalCode,
+  isValidShippingRegion,
+} from "@/lib/utils";
 import { DELIVERY_FEE_CAD, DELIVERY_FEE_USD } from "@/lib/constants";
 
 function getStripe() {
@@ -53,6 +58,18 @@ export async function POST(req: NextRequest) {
 
     if (country !== "CA" && country !== "US") {
       return NextResponse.json({ error: "Only Canada and USA are supported" }, { status: 400 });
+    }
+
+    if (
+      !shippingAddress.first_name?.trim() ||
+      !shippingAddress.last_name?.trim() ||
+      !isValidEmail(shippingAddress.email || "") ||
+      !shippingAddress.address_line1?.trim() ||
+      !shippingAddress.city?.trim() ||
+      !isValidShippingRegion(country, shippingAddress.province_state || "") ||
+      !isValidShippingPostalCode(country, shippingAddress.postal_code || "")
+    ) {
+      return NextResponse.json({ error: "Please provide a complete and valid shipping address" }, { status: 400 });
     }
 
     if (!shippingAddress.phone || !isValidNorthAmericanPhone(shippingAddress.phone)) {
