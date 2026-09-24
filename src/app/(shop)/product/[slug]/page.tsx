@@ -242,7 +242,7 @@ export default async function ProductPage({
       />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
       {/* Mobile back button */}
-      <BackButton />
+      <BackButton href="/shop" label="Back to shop" />
       {/* Breadcrumb */}
       <nav className="text-sm text-foreground/60 mb-8 hidden lg:block">
         <Link href="/" className="hover:text-primary">Home</Link>

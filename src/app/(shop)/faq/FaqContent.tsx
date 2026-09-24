@@ -39,7 +39,7 @@ export default function FaqContent() {
       {/* Header */}
       <section className="bg-muted/50 py-16">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <div className="text-left"><BackButton /></div>
+          <div className="text-left"><BackButton href="/" label="Back to home" /></div>
           <HelpCircle className="w-12 h-12 text-primary mx-auto mb-4" strokeWidth={1.5} />
           <h1 className="text-4xl lg:text-5xl font-serif text-foreground">
             Frequently Asked Questions

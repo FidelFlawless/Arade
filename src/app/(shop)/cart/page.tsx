@@ -53,7 +53,7 @@ export default function CartPage() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
-      <BackButton />
+      <BackButton href="/shop" label="Back to shop" />
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6 sm:mb-8">
         <div>
           <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-foreground">

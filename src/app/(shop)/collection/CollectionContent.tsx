@@ -126,7 +126,7 @@ export default function CollectionContent({
       {selectedCollection && (
         <section id="collection-products" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-16">
           <div className="border-t border-border pt-12">
-            <BackButton />
+            <BackButton href="/collection" label="Back to collections" />
             <nav className="text-sm text-foreground/50 mb-6">
               <Link href="/" className="hover:text-primary">Home</Link> / 
               <Link href="/collection" className="hover:text-primary">Collection</Link> / 
