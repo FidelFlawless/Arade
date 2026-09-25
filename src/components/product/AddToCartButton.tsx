@@ -62,7 +62,7 @@ export default function AddToCartButton({ product }: { product: Product }) {
           >
             <Minus className="w-4 h-4" />
           </button>
-          <span className="px-4 py-2 font-medium min-w-[2.5rem] text-center text-sm">
+          <span className="px-4 py-2 font-medium min-w-10 text-center text-sm">
             {quantity}
           </span>
           <button

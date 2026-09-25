@@ -399,7 +399,7 @@ export default async function ProductPage({
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
             {relatedProducts.map((rp) => (
               <a key={rp.id} href={"/product/" + rp.slug} className="group card p-0 hover:shadow-lg">
-                <div className="aspect-[4/3] bg-muted relative overflow-hidden rounded-t-lg">
+                <div className="aspect-4/3 bg-muted relative overflow-hidden rounded-t-lg">
                   {rp.images && rp.images[0] ? (
                     <Image
                       src={rp.images[0]}

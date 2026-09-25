@@ -15,7 +15,7 @@ function FaqItem({ question, answer }: { question: string; answer: string }) {
       >
         <span className="font-medium text-foreground pr-4">{question}</span>
         <ChevronDown
-          className={`w-5 h-5 text-foreground/50 flex-shrink-0 transition-transform duration-200 ${
+          className={`w-5 h-5 text-foreground/50 shrink-0 transition-transform duration-200 ${
             isOpen ? "rotate-180" : ""
           }`}
         />

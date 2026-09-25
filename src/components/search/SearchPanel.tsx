@@ -95,7 +95,7 @@ export default function SearchPanel({ isOpen, onClose }: SearchPanelProps) {
       <div className="relative w-full bg-white shadow-2xl border-b border-border">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 py-4">
           <div className="flex items-center gap-3">
-            <Search className="w-5 h-5 text-foreground/40 flex-shrink-0" />
+            <Search className="w-5 h-5 text-foreground/40 shrink-0" />
             <input
               ref={inputRef}
               type="text"
@@ -120,7 +120,7 @@ export default function SearchPanel({ isOpen, onClose }: SearchPanelProps) {
               <div className="space-y-1">
                 {results.map((product) => (
                   <Link key={product.id} href={`/product/${product.slug}`} onClick={handleResultClick} className="flex items-center gap-4 p-3 rounded-xl hover:bg-muted transition-colors group">
-                    <div className="relative w-14 h-14 bg-muted rounded-lg overflow-hidden flex-shrink-0">
+                    <div className="relative w-14 h-14 bg-muted rounded-lg overflow-hidden shrink-0">
                       {product.images && product.images[0] ? (
                         <Image src={product.images[0]} alt={product.name} fill sizes="56px" loading="lazy" decoding="async" style={{ objectFit: "cover" }} />
                       ) : (
@@ -131,7 +131,7 @@ export default function SearchPanel({ isOpen, onClose }: SearchPanelProps) {
                       <h4 className="font-medium text-foreground text-sm truncate group-hover:text-primary transition-colors">{product.name}</h4>
                       {product.categories?.[0]?.name && <p className="text-xs text-foreground/40 mt-0.5">{product.categories[0].name}</p>}
                     </div>
-                    <span className="font-semibold text-primary text-sm flex-shrink-0">C${product.price_cad}</span>
+                    <span className="font-semibold text-primary text-sm shrink-0">C${product.price_cad}</span>
                   </Link>
                 ))}
                 <Link href={`/shop?search=${encodeURIComponent(query)}`} onClick={handleResultClick} className="flex items-center justify-center gap-2 py-3 mt-2 text-sm font-medium text-primary hover:text-primary/80 transition-colors border-t border-border">

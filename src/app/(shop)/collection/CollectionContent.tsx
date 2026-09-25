@@ -76,11 +76,11 @@ export default function CollectionContent({
       {/* Hero */}
       <section className="relative bg-[#d5c4a8] overflow-hidden">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 lg:py-24">
-          <div className="grid grid-cols-1 lg:grid-cols-[4fr_6fr] gap-8 items-center min-h-[350px] lg:min-h-[450px]">
+          <div className="grid grid-cols-1 lg:grid-cols-[4fr_6fr] gap-8 items-center min-h-87.5 lg:min-h-112.5">
             <div className="py-8 lg:py-0 z-10">
               <div className="flex items-center gap-3 mb-6">
                 <span className="text-sm font-medium tracking-widest text-primary uppercase">Our Collections</span>
-                <span className="w-12 h-[1px] bg-primary"></span>
+                <span className="w-12 h-px bg-primary"></span>
               </div>
               <h1 className="text-4xl sm:text-5xl lg:text-6xl font-serif text-foreground leading-[1.1]">
                 Curated skincare for{" "}
@@ -90,7 +90,7 @@ export default function CollectionContent({
                 Thoughtfully chosen products to cleanse, nourish and reveal your natural glow.
               </p>
             </div>
-            <div className="relative flex justify-end items-center -mr-4 sm:-mr-8 lg:-mr-0">
+            <div className="relative flex justify-end items-center -mr-4 sm:-mr-8 lg:mr-0">
               <img src="/image.webp" alt="Arade Collection" width={1536} height={1024} decoding="async" className="w-full max-w-[380px] lg:max-w-[520px] h-auto object-contain mix-blend-multiply" style={{ maskImage: "linear-gradient(to right,transparent 0%,black 15%)", WebkitMaskImage: "linear-gradient(to right,transparent 0%,black 15%)" }} />
             </div>
           </div>
@@ -106,7 +106,7 @@ export default function CollectionContent({
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {collections.map((col) => (
             <button key={col.slug} onClick={() => loadProducts(col.slug)} className={"group text-left rounded-2xl overflow-hidden border transition-all duration-300 hover:shadow-lg cursor-pointer " + (selectedCollection === col.slug ? "border-primary shadow-lg ring-1 ring-primary/20" : "border-border bg-white")}>
-              <div className="aspect-[16/10] bg-muted relative overflow-hidden">
+              <div className="aspect-16/10 bg-muted relative overflow-hidden">
                 {col.image ? (
                   <Image src={col.image} alt={col.name} fill sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw" loading="lazy" decoding="async" style={{ objectFit: "cover" }} className="group-hover:scale-105 transition-transform duration-500" />
                 ) : <div className="w-full h-full flex items-center justify-center text-foreground/20">No Image</div>}

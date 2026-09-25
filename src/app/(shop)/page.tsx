@@ -56,14 +56,14 @@ export default async function HomePage() {
       {/* Hero Section */}
       <section className="relative bg-[#d5c4a8] overflow-hidden">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 lg:grid-cols-[5fr_5fr] gap-6 lg:gap-8 items-center min-h-[350px] lg:min-h-[520px]">
+          <div className="grid grid-cols-1 lg:grid-cols-[5fr_5fr] gap-6 lg:gap-8 items-center min-h-87.5 lg:min-h-130">
             {/* Left content */}
             <div className="py-8 sm:py-12 lg:py-0 z-10">
               <div className="flex items-center gap-3 mb-4 sm:mb-6">
                 <span className="text-xs sm:text-sm font-medium tracking-widest text-primary uppercase">
                   Beauty · Skincare · Hair · Fashion
                 </span>
-                <span className="w-8 sm:w-12 h-[1px] bg-primary"></span>
+                <span className="w-8 sm:w-12 h-px bg-primary"></span>
               </div>
               <h1 className="text-4xl sm:text-5xl lg:text-6xl xl:text-7xl font-serif text-foreground leading-[1.1]">
                 Elevate Your{' '}
@@ -108,28 +108,28 @@ export default async function HomePage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-2 lg:grid-cols-4 divide-x divide-border">
             <div className="flex items-center gap-4 py-6 px-4 lg:px-6">
-              <Leaf className="w-8 h-8 text-primary flex-shrink-0" strokeWidth={1.5} />
+              <Leaf className="w-8 h-8 text-primary shrink-0" strokeWidth={1.5} />
               <div>
                 <h3 className="font-semibold text-foreground text-sm">Curated Selection</h3>
                 <p className="text-xs text-foreground/50 mt-0.5">Carefully chosen products you can trust.</p>
               </div>
             </div>
             <div className="flex items-center gap-4 py-6 px-4 lg:px-6">
-              <Droplets className="w-8 h-8 text-primary flex-shrink-0" strokeWidth={1.5} />
+              <Droplets className="w-8 h-8 text-primary shrink-0" strokeWidth={1.5} />
               <div>
                 <h3 className="font-semibold text-foreground text-sm">Quality Products</h3>
                 <p className="text-xs text-foreground/50 mt-0.5">Premium beauty and fashion essentials.</p>
               </div>
             </div>
             <div className="flex items-center gap-4 py-6 px-4 lg:px-6">
-              <Rabbit className="w-8 h-8 text-primary flex-shrink-0" strokeWidth={1.5} />
+              <Rabbit className="w-8 h-8 text-primary shrink-0" strokeWidth={1.5} />
               <div>
                 <h3 className="font-semibold text-foreground text-sm">Cruelty Free</h3>
                 <p className="text-xs text-foreground/50 mt-0.5">We never test on animals.</p>
               </div>
             </div>
             <div className="flex items-center gap-4 py-6 px-4 lg:px-6">
-              <ShieldCheck className="w-8 h-8 text-primary flex-shrink-0" strokeWidth={1.5} />
+              <ShieldCheck className="w-8 h-8 text-primary shrink-0" strokeWidth={1.5} />
               <div>
                 <h3 className="font-semibold text-foreground text-sm">Secure Payment</h3>
                 <p className="text-xs text-foreground/50 mt-0.5">Your payment information is always protected.</p>

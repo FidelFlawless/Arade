@@ -79,7 +79,7 @@ export default function ProductImageGallery({ images, name }: Props) {
             <button
               key={i}
               onClick={() => setSelected(i)}
-              className={`relative w-16 h-16 sm:w-20 sm:h-20 rounded-lg overflow-hidden flex-shrink-0 border-2 transition-all cursor-pointer ${
+              className={`relative w-16 h-16 sm:w-20 sm:h-20 rounded-lg overflow-hidden shrink-0 border-2 transition-all cursor-pointer ${
                 i === selected
                   ? "border-primary ring-2 ring-primary/20"
                   : "border-transparent hover:border-foreground/20"

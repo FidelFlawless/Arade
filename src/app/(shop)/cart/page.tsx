@@ -82,7 +82,7 @@ export default function CartPage() {
               {/* Product image */}
               <Link
                 href={`/product/${item.slug}`}
-                className="w-full sm:w-32 h-32 bg-muted rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden"
+                className="w-full sm:w-32 h-32 bg-muted rounded-lg flex items-center justify-center shrink-0 overflow-hidden"
               >
                 {item.image ? (
                   <img
@@ -111,7 +111,7 @@ export default function CartPage() {
                   </div>
                   <button
                     onClick={() => removeFromCart(item.id)}
-                    className="text-foreground/30 hover:text-red-500 transition-colors flex-shrink-0"
+                    className="text-foreground/30 hover:text-red-500 transition-colors shrink-0"
                     aria-label="Remove item"
                   >
                     <Trash2 className="w-5 h-5" />
@@ -128,7 +128,7 @@ export default function CartPage() {
                     >
                       <Minus className="w-4 h-4" />
                     </button>
-                    <span className="px-3 py-2 font-medium min-w-[2.5rem] text-center text-sm">
+                    <span className="px-3 py-2 font-medium min-w-10 text-center text-sm">
                       {updating === item.id ? (
                         <Loader2 className="w-4 h-4 animate-spin mx-auto" />
                       ) : (

@@ -75,7 +75,7 @@ export default function CategoryContent({
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
         <div className="flex flex-col lg:flex-row gap-8">
           {/* Sidebar - Desktop */}
-          <aside className="hidden lg:block w-64 flex-shrink-0">
+          <aside className="hidden lg:block w-64 shrink-0">
             <div className="sticky top-24">
               <h3 className="font-semibold text-foreground mb-4">Subcategories</h3>
               <div className="space-y-1">
@@ -113,7 +113,7 @@ export default function CategoryContent({
               <div className="flex gap-2 pb-2">
                 <button
                   onClick={() => setSelectedSub(null)}
-                  className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+                  className={`shrink-0 px-4 py-2 rounded-full text-sm font-medium transition-colors ${
                     !selectedSub
                       ? "bg-primary text-white"
                       : "bg-muted text-foreground/70"
@@ -125,7 +125,7 @@ export default function CategoryContent({
                   <button
                     key={sub.id}
                     onClick={() => setSelectedSub(sub.id)}
-                    className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+                    className={`shrink-0 px-4 py-2 rounded-full text-sm font-medium transition-colors ${
                       selectedSub === sub.id
                         ? "bg-primary text-white"
                         : "bg-muted text-foreground/70"

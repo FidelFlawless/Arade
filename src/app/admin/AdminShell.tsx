@@ -57,7 +57,7 @@ function AdminSidebar() {
               const Icon = item.icon;
               const isActive = item.href === "/admin" ? pathname === "/admin" : pathname.startsWith(item.href);
               return <Link key={item.href} href={item.href} onClick={() => setMobileOpen(false)} className={`flex items-center gap-3 px-4 py-3 transition-colors ${isActive ? "bg-primary/20 text-primary-light" : "text-white/60 hover:bg-white/10 hover:text-white"} ${collapsed ? "justify-center" : ""}`} title={collapsed ? item.label : undefined}>
-                <Icon className="w-5 h-5 flex-shrink-0" />
+                <Icon className="w-5 h-5 shrink-0" />
                 {!collapsed && <span>{item.label}</span>}
               </Link>;
             })}
