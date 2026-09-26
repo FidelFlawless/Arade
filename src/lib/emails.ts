@@ -4,7 +4,7 @@ import { createClient } from "@supabase/supabase-js";
  * Transactional order confirmation email, sent via Brevo after a payment is
  * confirmed server-side (Stripe webhook or PayPal capture - never client-side).
  *
- * The sender must be a verified sender in Brevo (hello@aradeshop.com),
+ * The sender must be a verified sender in Brevo (support@aradeshop.com),
  * otherwise Brevo silently rejects delivery.
  */
 
@@ -14,8 +14,9 @@ const supabaseAdmin = createClient(
 );
 
 const BREVO_API_KEY = process.env.BREVO_API_KEY!;
+const ORDER_NOTIFICATION_EMAIL = process.env.ORDER_NOTIFICATION_EMAIL;
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://www.aradeshop.com";
-const SENDER = { name: "Arade", email: "hello@aradeshop.com" };
+const SENDER = { name: "Arade", email: "support@aradeshop.com" };
 
 /** Escape user-provided strings before embedding them in HTML. */
 function esc(value: unknown): string {
@@ -56,7 +57,7 @@ function emailShell(title: string, bodyHtml: string): string {
   <body style="margin: 0; padding: 0; background-color: #faf8f5; font-family: 'Helvetica Neue', Arial, sans-serif;">
     <div style="max-width: 560px; margin: 0 auto; padding: 40px 20px;">
       <div style="text-align: center; margin-bottom: 32px;">
-        <img src="${SITE_URL}/logo.webp" alt="Arade" width="72" height="72" style="display: block; margin: 0 auto 12px; border-radius: 16px;" />
+        <img src="${SITE_URL}/icon.png" alt="Arade" width="72" height="72" style="display: block; margin: 0 auto 12px; border-radius: 16px;" />
         <h1 style="font-size: 24px; color: #1a1a2e; margin: 0 0 8px; font-weight: 700;">Arade</h1>
         <p style="color: #8B5E3C; font-size: 13px; letter-spacing: 2px; margin: 0; text-transform: uppercase;">Beauty &middot; Skincare &middot; Hair &middot; Fashion</p>
       </div>
@@ -75,7 +76,8 @@ function emailShell(title: string, bodyHtml: string): string {
 
 interface OrderRow {
   id: string;
-  user_id: string;
+  user_id: string | null;
+  shipping_email?: string | null;
   order_number: string;
   subtotal: number | string;
   delivery_fee: number | string;
@@ -137,17 +139,20 @@ export async function sendOrderConfirmationEmail(orderId: string): Promise<boole
       return false;
     }
 
-    // The orders table has no email column - the recipient is the
-    // account email on the user's profile.
-    const { data: profile } = await supabaseAdmin
-      .from("profiles")
-      .select("email")
-      .eq("id", (order as OrderRow).user_id)
-      .single();
+    // Recipient: the guest email stored on the order, or the account email
+    // on the user's profile for logged-in customers (older orders).
+    let recipient: string | null = (order as Partial<OrderRow>).shipping_email || null;
+    if (!recipient && (order as OrderRow).user_id) {
+      const { data: profile } = await supabaseAdmin
+        .from("profiles")
+        .select("email")
+        .eq("id", (order as OrderRow).user_id)
+        .single();
+      recipient = profile?.email || null;
+    }
 
-    const recipient = profile?.email;
     if (!recipient) {
-      console.error("Order confirmation email: no account email for user", (order as OrderRow).user_id);
+      console.error("Order confirmation email: no recipient for order", orderId);
       return false;
     }
 
@@ -177,10 +182,10 @@ export async function sendOrderConfirmationEmail(orderId: string): Promise<boole
 
     const discountRow =
       o.discount && parseFloat(String(o.discount)) > 0
-        ? `<div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
-            <span style="color: #666; font-size: 14px;">Discount</span>
-            <span style="color: #666; font-size: 14px;">-${money(o.discount, o.currency)}</span>
-          </div>`
+        ? `<tr>
+            <td style="padding: 6px 0; color: #666; font-size: 14px;">Discount</td>
+            <td style="padding: 6px 0; color: #666; font-size: 14px; text-align: right;">-${money(o.discount, o.currency)}</td>
+          </tr>`
         : "";
 
     const htmlContent = emailShell(
@@ -191,36 +196,38 @@ export async function sendOrderConfirmationEmail(orderId: string): Promise<boole
         Your payment has been confirmed and we're getting your order ready.
       </p>
 
-      <div style="background: #faf8f5; border-radius: 10px; padding: 14px 18px; margin-bottom: 24px; display: flex; justify-content: space-between;">
-        <div>
-          <p style="margin: 0; color: #999; font-size: 12px; text-transform: uppercase; letter-spacing: 1px;">Order number</p>
-          <p style="margin: 4px 0 0; font-weight: 700; color: #1a1a2e; font-size: 15px;">${esc(o.order_number)}</p>
-        </div>
-        <div style="text-align: right;">
-          <p style="margin: 0; color: #999; font-size: 12px; text-transform: uppercase; letter-spacing: 1px;">Date</p>
-          <p style="margin: 4px 0 0; font-weight: 600; color: #1a1a2e; font-size: 14px;">${esc(formatDate(o.created_at))}</p>
-        </div>
-      </div>
+      <table style="width: 100%; border-collapse: collapse; background: #faf8f5; border-radius: 10px; margin-bottom: 24px;">
+        <tr>
+          <td style="padding: 14px 18px;">
+            <p style="margin: 0; color: #999; font-size: 12px; text-transform: uppercase; letter-spacing: 1px;">Order number</p>
+            <p style="margin: 4px 0 0; font-weight: 700; color: #1a1a2e; font-size: 15px;">${esc(o.order_number)}</p>
+          </td>
+          <td style="padding: 14px 18px; text-align: right; vertical-align: top;">
+            <p style="margin: 0; color: #999; font-size: 12px; text-transform: uppercase; letter-spacing: 1px;">Date</p>
+            <p style="margin: 4px 0 0; font-weight: 600; color: #1a1a2e; font-size: 14px;">${esc(formatDate(o.created_at))}</p>
+          </td>
+        </tr>
+      </table>
 
       <table style="width: 100%; border-collapse: collapse;">
         ${itemRows}
       </table>
 
-      <div style="margin-top: 20px; padding-top: 16px; border-top: 2px solid #f0ece4;">
-        <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
-          <span style="color: #666; font-size: 14px;">Subtotal</span>
-          <span style="color: #666; font-size: 14px;">${money(o.subtotal, o.currency)}</span>
-        </div>
+      <table style="width: 100%; border-collapse: collapse; margin-top: 20px;">
+        <tr>
+          <td style="padding: 16px 0 6px; border-top: 2px solid #f0ece4; color: #666; font-size: 14px;">Subtotal</td>
+          <td style="padding: 16px 0 6px; border-top: 2px solid #f0ece4; color: #666; font-size: 14px; text-align: right;">${money(o.subtotal, o.currency)}</td>
+        </tr>
         ${discountRow}
-        <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
-          <span style="color: #666; font-size: 14px;">Delivery</span>
-          <span style="color: #666; font-size: 14px;">${money(o.delivery_fee, o.currency)}</span>
-        </div>
-        <div style="display: flex; justify-content: space-between; margin-top: 12px; padding-top: 12px; border-top: 1px solid #f0ece4;">
-          <span style="font-weight: 700; color: #1a1a2e; font-size: 16px;">Total</span>
-          <span style="font-weight: 700; color: #8B5E3C; font-size: 16px;">${money(o.total, o.currency)}</span>
-        </div>
-      </div>
+        <tr>
+          <td style="padding: 6px 0; color: #666; font-size: 14px;">Delivery</td>
+          <td style="padding: 6px 0; color: #666; font-size: 14px; text-align: right;">${money(o.delivery_fee, o.currency)}</td>
+        </tr>
+        <tr>
+          <td style="padding: 12px 0 0; border-top: 1px solid #f0ece4; font-weight: 700; color: #1a1a2e; font-size: 16px;">Total</td>
+          <td style="padding: 12px 0 0; border-top: 1px solid #f0ece4; font-weight: 700; color: #8B5E3C; font-size: 16px; text-align: right;">${money(o.total, o.currency)}</td>
+        </tr>
+      </table>
 
       <div style="margin-top: 24px;">
         <p style="margin: 0 0 8px; font-weight: 700; color: #1a1a2e; font-size: 14px;">Shipping to</p>
@@ -245,20 +252,162 @@ export async function sendOrderConfirmationEmail(orderId: string): Promise<boole
       body: JSON.stringify({
         sender: SENDER,
         to: [{ email: recipient }],
+        ...(ORDER_NOTIFICATION_EMAIL && ORDER_NOTIFICATION_EMAIL.toLowerCase() !== recipient.toLowerCase()
+          ? { bcc: [{ email: ORDER_NOTIFICATION_EMAIL }] }
+          : {}),
         subject: `Your Arade order ${o.order_number} - view your order details`,
+        htmlContent,
+      }),
+    });
+
+    const customerEmailSent = response.ok;
+    if (!customerEmailSent) {
+      const errText = await response.text().catch(() => "");
+      console.error("Order confirmation email failed:", response.status, errText.slice(0, 300));
+    }
+
+    if (ORDER_NOTIFICATION_EMAIL && ORDER_NOTIFICATION_EMAIL.toLowerCase() !== recipient.toLowerCase()) {
+      const ownerHtml = emailShell(
+        "New order received",
+        `
+        <h2 style="font-size: 20px; color: #1a1a2e; margin: 0 0 8px;">New order received</h2>
+        <p style="color: #666; font-size: 14px; margin: 0 0 24px; line-height: 1.6;">
+          A customer has completed payment for a new Arade order.
+        </p>
+        <table style="width: 100%; border-collapse: collapse; background: #faf8f5; border-radius: 10px; margin-bottom: 24px;">
+          <tr>
+            <td style="padding: 14px 18px;">
+              <p style="margin: 0; color: #999; font-size: 12px; text-transform: uppercase; letter-spacing: 1px;">Order number</p>
+              <p style="margin: 4px 0 0; font-weight: 700; color: #1a1a2e; font-size: 15px;">${esc(o.order_number)}</p>
+            </td>
+            <td style="padding: 14px 18px; text-align: right; vertical-align: top;">
+              <p style="margin: 0; color: #999; font-size: 12px; text-transform: uppercase; letter-spacing: 1px;">Total</p>
+              <p style="margin: 4px 0 0; font-weight: 700; color: #8B5E3C; font-size: 15px;">${money(o.total, o.currency)}</p>
+            </td>
+          </tr>
+        </table>
+        <p style="margin: 0 0 8px; font-weight: 700; color: #1a1a2e; font-size: 14px;">Customer</p>
+        <p style="margin: 0 0 20px; color: #333; font-size: 14px; line-height: 1.7;">
+          ${esc(o.shipping_first_name)} ${esc(o.shipping_last_name)}<br />
+          ${esc(recipient)}
+        </p>
+        <p style="margin: 0 0 8px; font-weight: 700; color: #1a1a2e; font-size: 14px;">Items</p>
+        <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+          ${itemRows}
+        </table>
+        <p style="margin: 0 0 8px; font-weight: 700; color: #1a1a2e; font-size: 14px;">Ship to</p>
+        ${addressHtml}
+        <div style="text-align: center; margin-top: 28px;">
+          <a href="${SITE_URL}/admin/orders" style="display: inline-block; background-color: #8B5E3C; color: white; padding: 14px 40px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 15px;">Open Admin Orders</a>
+        </div>`
+      );
+
+      const ownerResponse = await fetch("https://api.brevo.com/v3/smtp/email", {
+        method: "POST",
+        headers: {
+          accept: "application/json",
+          "content-type": "application/json",
+          "api-key": BREVO_API_KEY,
+        },
+        body: JSON.stringify({
+          sender: SENDER,
+          to: [{ email: ORDER_NOTIFICATION_EMAIL }],
+          subject: `New Arade order ${o.order_number} - ${money(o.total, o.currency)}`,
+          htmlContent: ownerHtml,
+        }),
+      });
+
+      if (!ownerResponse.ok) {
+        const errText = await ownerResponse.text().catch(() => "");
+        console.error("Owner order notification failed:", ownerResponse.status, errText.slice(0, 300));
+      }
+    }
+
+    return customerEmailSent;
+  } catch (err) {
+    console.error("Order confirmation email error:", err);
+    return false;
+  }
+}
+
+/**
+ * Send the welcome email with the first-order discount code after a
+ * successful signup. Pulls the active first-order coupon from the DB so
+ * the email always carries the current code (even if renamed in admin).
+ * Never throws - best-effort, safe to fire without blocking signup.
+ */
+export async function sendWelcomeEmail(recipientEmail: string, firstName: string): Promise<boolean> {
+  try {
+    if (!BREVO_API_KEY) {
+      console.error("Welcome email skipped: BREVO_API_KEY not set");
+      return false;
+    }
+
+    // Find the active first-order coupon. If none exists there is no
+    // discount to promise, so skip the email entirely.
+    const { data: coupon } = await supabaseAdmin
+      .from("coupons")
+      .select("code, discount_type, discount_value_cad, first_order_only, active")
+      .eq("first_order_only", true)
+      .eq("active", true)
+      .limit(1)
+      .maybeSingle();
+
+    if (!coupon) {
+      return false; // no active first-order coupon - nothing to offer
+    }
+
+    const discountLabel =
+      coupon.discount_type === "percent"
+        ? `${Number(coupon.discount_value_cad)}% OFF`
+        : `${money(coupon.discount_value_cad, "CAD")} OFF`;
+
+    const htmlContent = emailShell(
+      "Welcome to Arade",
+      `
+      <h2 style="font-size: 20px; color: #1a1a2e; margin: 0 0 8px;">Welcome, ${esc(firstName || "there")}!</h2>
+      <p style="color: #666; font-size: 14px; margin: 0 0 24px; line-height: 1.6;">
+        Thanks for creating an account with Arade. As a welcome gift, here's
+        <strong style="color: #8B5E3C;">${esc(discountLabel)}</strong> your first order.
+      </p>
+
+      <div style="background: #faf8f5; border: 2px dashed #8B5E3C; border-radius: 10px; padding: 20px; text-align: center; margin-bottom: 24px;">
+        <p style="margin: 0 0 6px; color: #999; font-size: 12px; text-transform: uppercase; letter-spacing: 1px;">Your welcome code</p>
+        <p style="margin: 0; font-weight: 700; color: #8B5E3C; font-size: 26px; letter-spacing: 3px;">${esc(coupon.code)}</p>
+        <p style="margin: 8px 0 0; color: #666; font-size: 12px;">Valid for 30 days, on your first order only.</p>
+      </div>
+
+      <div style="text-align: center;">
+        <a href="${SITE_URL}/shop" style="display: inline-block; background-color: #8B5E3C; color: white; padding: 14px 40px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 15px;">Start Shopping</a>
+      </div>
+      <p style="text-align: center; color: #999; font-size: 12px; margin-top: 12px;">
+        Just sign in at checkout and the discount is applied automatically.
+      </p>`
+    );
+
+    const response = await fetch("https://api.brevo.com/v3/smtp/email", {
+      method: "POST",
+      headers: {
+        accept: "application/json",
+        "content-type": "application/json",
+        "api-key": BREVO_API_KEY,
+      },
+      body: JSON.stringify({
+        sender: SENDER,
+        to: [{ email: recipientEmail }],
+        subject: `Welcome to Arade - ${discountLabel} your first order`,
         htmlContent,
       }),
     });
 
     if (!response.ok) {
       const errText = await response.text().catch(() => "");
-      console.error("Order confirmation email failed:", response.status, errText.slice(0, 300));
+      console.error("Welcome email failed:", response.status, errText.slice(0, 300));
       return false;
     }
-
     return true;
   } catch (err) {
-    console.error("Order confirmation email error:", err);
+    console.error("Welcome email error:", err);
     return false;
   }
 }

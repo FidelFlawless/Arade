@@ -18,7 +18,7 @@ const contactSchema = {
     "@type": "Organization",
     name: "Arade",
     url: absoluteUrl("/"),
-    email: "Fideliarufus35@gmail.com",
+    email: "support@aradeshop.com",
     telephone: "+1 (437) 566-2773",
     address: {
       "@type": "PostalAddress",
@@ -28,7 +28,7 @@ const contactSchema = {
     contactPoint: {
       "@type": "ContactPoint",
       contactType: "customer support",
-      email: "Fideliarufus35@gmail.com",
+      email: "support@aradeshop.com",
       telephone: "+1 (437) 566-2773",
       availableLanguage: ["English"],
       hoursAvailable: [

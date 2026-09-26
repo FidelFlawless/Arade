@@ -8,6 +8,7 @@ import {
   isValidShippingRegion,
 } from "@/lib/utils";
 import { DELIVERY_FEE_CAD, DELIVERY_FEE_USD } from "@/lib/constants";
+import { validateCoupon, recordCouponUsage } from "@/lib/coupons";
 
 function getStripe() {
   const rawKey = process.env.STRIPE_SECRET_KEY || "";
@@ -30,21 +31,26 @@ export async function POST(req: NextRequest) {
   try {
     const stripe = getStripe();
     const body = await req.json();
-    const { userId, items, shippingAddress, country, currency } = body;
+    const { userId, items, shippingAddress, country, currency, couponCode } = body;
 
-    // 1. Verify user exists in database (service-role key bypasses RLS)
-    if (!userId) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const { data: profile } = await supabaseAdmin
-      .from("profiles")
-      .select("id")
-      .eq("id", userId)
-      .single();
-
-    if (!profile) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    // 1. Guest checkout: authentication is OPTIONAL. If a userId and bearer
+    // token are provided, verify the token actually belongs to that user
+    // (never trust the body alone). Guests proceed without either.
+    const authHeader = req.headers.get("authorization");
+    if (userId) {
+      if (!authHeader) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      }
+      const token = authHeader.replace(/^Bearer\s+/i, "");
+      const supabaseAuth = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      );
+      // Pass the JWT explicitly - global headers are not honoured by getUser()
+      const { data: { user }, error: authError } = await supabaseAuth.auth.getUser(token);
+      if (authError || !user || user.id !== userId) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      }
     }
 
     // 2. Validate inputs
@@ -159,21 +165,44 @@ export async function POST(req: NextRequest) {
 
     const total = subtotal + deliveryFee;
 
-    // 6. Build Stripe line items
+    // 6b. Coupon: validate server-side against the server-calculated subtotal.
+    let discount = 0;
+    let appliedCouponCode: string | null = null;
+    if (couponCode && typeof couponCode === "string") {
+      const couponResult = await validateCoupon(couponCode, currency, subtotal);
+      if (!couponResult.ok) {
+        return NextResponse.json({ error: couponResult.error || "Invalid coupon" }, { status: 400 });
+      }
+      discount = couponResult.discount || 0;
+      appliedCouponCode = couponResult.code || null;
+    }
+
+    // The customer pays (subtotal - discount) + delivery. Discount reduces the
+    // product line items so Stripe's charged amount exactly matches the order total.
+    const payableSubtotal = Math.max(0, Math.round((subtotal - discount) * 100) / 100);
+    const grandTotal = Math.round((payableSubtotal + deliveryFee) * 100) / 100;
+
+    // 6. Build Stripe line items. When a coupon applies, the discount is
+    // spread proportionally across product lines so the per-item amounts
+    // stay consistent with the displayed order total.
+    const discountRatio = subtotal > 0 ? Math.min(1, discount / subtotal) : 0;
     const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = validatedItems.map(
-      (item) => ({
-        price_data: {
-          currency: currency.toLowerCase(),
-          product_data: {
-            name: item.name,
-            ...(item.image && typeof item.image === "string" && item.image.startsWith("http")
-              ? { images: [item.image] }
-              : {}),
+      (item) => {
+        const discountedUnit = Math.round(item.serverPrice * (1 - discountRatio) * 100);
+        return {
+          price_data: {
+            currency: currency.toLowerCase(),
+            product_data: {
+              name: item.name,
+              ...(item.image && typeof item.image === "string" && item.image.startsWith("http")
+                ? { images: [item.image] }
+                : {}),
+            },
+            unit_amount: discountedUnit, // Stripe uses cents
           },
-          unit_amount: Math.round(item.serverPrice * 100), // Stripe uses cents
-        },
-        quantity: item.quantity,
-      })
+          quantity: item.quantity,
+        };
+      }
     );
 
     // Add delivery fee as a line item if > 0
@@ -196,15 +225,17 @@ export async function POST(req: NextRequest) {
     const { data: order, error: orderError } = await supabaseAdmin
       .from("orders")
       .insert({
-        user_id: userId,
+        user_id: userId || null,
         order_number: orderNumber,
         subtotal,
         delivery_fee: deliveryFee,
-        discount: 0,
-        total,
+        discount,
+        total: grandTotal,
         currency,
         payment_status: "pending",
         order_status: "pending",
+        shipping_email: shippingAddress.email || null,
+        coupon_code: appliedCouponCode,
         shipping_first_name: shippingAddress.first_name,
         shipping_last_name: shippingAddress.last_name,
         shipping_phone: shippingAddress.phone || null,
@@ -280,7 +311,8 @@ export async function POST(req: NextRequest) {
       metadata: {
         order_id: order.id,
         order_number: order.order_number,
-        user_id: userId,
+        user_id: userId || "guest",
+        coupon_code: appliedCouponCode || "",
       },
       success_url: `${baseUrl}/order/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${baseUrl}/checkout?cancelled=true`,

@@ -6,7 +6,7 @@ import { Save, Loader2, Check, X } from "lucide-react";
 export default function AdminSettingsPage() {
   const [settings, setSettings] = useState({
     store_name: "Arade",
-    store_email: "Fideliarufus35@gmail.com",
+    store_email: "support@aradeshop.com",
     store_phone: "+1 (437) 566-2773",
     store_address: "Ontario\nCanada",
     business_hours: "Mon - Fri: 9:00 AM - 6:00 PM EST\nSat: 10:00 AM - 4:00 PM EST\nSun: Closed",

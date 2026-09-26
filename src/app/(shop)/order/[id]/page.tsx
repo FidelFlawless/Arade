@@ -85,7 +85,28 @@ export default function OrderDetailPage() {
     return <div className="min-h-[60vh] flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
   }
   if (!user) {
-    return <div className="min-h-[60vh] flex items-center justify-center"><div className="text-center"><h2 className="text-xl font-bold mb-2">Please sign in</h2><Link href="/auth/login" className="btn-primary inline-block">Sign In</Link></div></div>;
+    // Guest-friendly screen: they may have clicked the email link before
+    // creating an account. Point them at tracking and sign-in options.
+    return (
+      <div className="min-h-[60vh] flex items-center justify-center px-4">
+        <div className="text-center max-w-md">
+          <Package className="w-12 h-12 text-primary/40 mx-auto mb-4" />
+          <h2 className="text-xl font-bold mb-2">Track this order</h2>
+          <p className="text-foreground/60 text-sm mb-6">
+            Sign in to see your full order history, or track this order with
+            your order number and the email you used at checkout.
+          </p>
+          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+            <Link href={`/order/track?order=${encodeURIComponent(orderNumber)}`} className="btn-primary inline-block">
+              Track as Guest
+            </Link>
+            <Link href={`/auth/login?redirect=${encodeURIComponent(`/order/${orderNumber}`)}`} className="px-4 py-2 rounded-lg border border-border text-sm inline-flex items-center justify-center hover:bg-muted">
+              Sign In
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
   }
   if (!order) {
     return <div className="min-h-[60vh] flex items-center justify-center"><div className="text-center"><h2 className="text-xl font-bold mb-2">Order not found</h2><Link href="/account/orders" className="btn-primary inline-block">View Orders</Link></div></div>;

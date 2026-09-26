@@ -23,7 +23,7 @@ const footerLinks = {
   ],
   support: [
     { label: "FAQ", href: "/faq" },
-    { label: "Track Order", href: "/account/orders" },
+    { label: "Track Order", href: "/order/track" },
   ],
 };
 

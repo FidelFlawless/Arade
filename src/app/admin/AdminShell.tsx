@@ -10,6 +10,8 @@ import {
   Users,
   FolderTree,
   CreditCard,
+  TicketPercent,
+  Star,
   Settings,
   Menu,
   X,
@@ -25,6 +27,8 @@ const adminNavItems = [
   { href: "/admin/orders", label: "Orders", icon: ShoppingCart },
   { href: "/admin/customers", label: "Customers", icon: Users },
   { href: "/admin/payments", label: "Payments", icon: CreditCard },
+  { href: "/admin/coupons", label: "Coupons", icon: TicketPercent },
+  { href: "/admin/reviews", label: "Reviews", icon: Star },
   { href: "/admin/settings", label: "Settings", icon: Settings },
 ];
 

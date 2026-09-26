@@ -67,7 +67,7 @@ export default function CheckoutPage() {
     postal_code: "",
   });
   const router = useRouter();
-  const { user, profile, loading: authLoading } = useAuth();
+  const { user, profile } = useAuth();
   const { items: cartItems } = useCart();
   const supabase = useRef(createClient()).current;
   const [loading, setLoading] = useState(false);
@@ -76,11 +76,17 @@ export default function CheckoutPage() {
   const [, setLoadingAddresses] = useState(true);
   const [errors, setErrors] = useState<Partial<Record<keyof ShippingForm, string>>>({});
   const [paymentMethod, setPaymentMethod] = useState<"stripe" | "paypal">("stripe");
+  const [couponInput, setCouponInput] = useState("");
+  const [appliedCoupon, setAppliedCoupon] = useState<{ code: string; discount: number } | null>(null);
+  const [couponMessage, setCouponMessage] = useState<{ type: "error" | "success"; text: string } | null>(null);
+  const [couponChecking, setCouponChecking] = useState(false);
+  const [autoApplied, setAutoApplied] = useState(false);
   const paypalButtonsRef = useRef<HTMLDivElement>(null);
   const paypalButtonsRendered = useRef(false);
   const [paypalScriptLoaded, setPaypalScriptLoaded] = useState(false);
 
-  useEffect(() => { if (!authLoading && !user) router.push("/auth/login?redirect=/checkout"); }, [user, authLoading, router]);
+  // Guest checkout: no login wall. Signed-in users get their profile info
+  // pre-filled below; guests simply fill in the form themselves.
 
   useEffect(() => {
     if (user) {
@@ -141,7 +147,72 @@ export default function CheckoutPage() {
     : currency === "CAD"
       ? storeSettings.delivery_fee_cad
       : storeSettings.delivery_fee_usd;
-  const total = subtotal + deliveryFee;
+  const discount = appliedCoupon?.discount || 0;
+  const payableSubtotal = Math.max(0, subtotal - discount);
+  const total = payableSubtotal + deliveryFee;
+
+  const applyCoupon = async () => {
+    const code = couponInput.trim();
+    if (!code) return;
+    setCouponChecking(true);
+    setCouponMessage(null);
+    try {
+      const res = await fetch("/api/coupons/validate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code, currency, subtotal }),
+      });
+      const data = await res.json();
+      if (data.valid) {
+        setAppliedCoupon({ code: data.code, discount: data.discount });
+        setCouponMessage({ type: "success", text: `Coupon ${data.code} applied` });
+        setCouponInput("");
+      } else {
+        setAppliedCoupon(null);
+        setCouponMessage({ type: "error", text: data.error || "Invalid coupon code" });
+      }
+    } catch {
+      setCouponMessage({ type: "error", text: "Could not validate coupon. Try again." });
+    } finally {
+      setCouponChecking(false);
+    }
+  };
+
+  const removeCoupon = () => {
+    setAppliedCoupon(null);
+    setCouponMessage(null);
+    setAutoApplied(false);
+  };
+
+  // Auto-apply the welcome (first-order) coupon for eligible signed-in
+  // customers. Runs once per session; never overrides a manual coupon.
+  useEffect(() => {
+    if (autoApplied || appliedCoupon || !user || cartItems.length === 0) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data: sessionData } = await supabase.auth.getSession();
+        const token = sessionData?.session?.access_token;
+        if (!token) return;
+        const res = await fetch(
+          `/api/coupons/auto?currency=${currency}&subtotal=${encodeURIComponent(subtotal)}`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        const data = await res.json();
+        if (!cancelled && data?.available) {
+          setAppliedCoupon({ code: data.code, discount: data.discount });
+          setAutoApplied(true);
+          setCouponMessage({ type: "success", text: "🎉 First-order discount applied!" });
+        }
+      } catch {
+        // Auto-apply is best-effort — never blocks checkout.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, cartItems.length, appliedCoupon, autoApplied, currency, subtotal]);
 
   const provinces = form.country === "CA" ? CANADIAN_PROVINCES : US_STATES;
 
@@ -216,8 +287,6 @@ export default function CheckoutPage() {
 
   // ─── Stripe checkout ─────────────────────────────────────────
   const handleStripeCheckout = useCallback(async () => {
-    if (!user) return;
-
     setLoading(true);
     setPaymentError("");
     try {
@@ -231,11 +300,12 @@ export default function CheckoutPage() {
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
         body: JSON.stringify({
-          userId: user.id,
+          userId: user?.id,
           items: buildItems(),
           shippingAddress: buildShippingAddress(),
           country: form.country,
           currency,
+          couponCode: appliedCoupon?.code || null,
         }),
       });
 
@@ -251,12 +321,10 @@ export default function CheckoutPage() {
       setPaymentError("Unable to start checkout. Please check your connection and try again.");
       setLoading(false);
     }
-  }, [user, form.country, currency, buildItems, buildShippingAddress, supabase]);
+  }, [user, form.country, currency, appliedCoupon, buildItems, buildShippingAddress, supabase]);
 
   // ─── PayPal checkout ─────────────────────────────────────────
   const handleCreatePayPalOrder = useCallback(async () => {
-    if (!user) throw new Error("not_authenticated");
-
     const { data: sessionData } = await supabase.auth.getSession();
     const token = sessionData?.session?.access_token || undefined;
 
@@ -267,11 +335,12 @@ export default function CheckoutPage() {
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
       body: JSON.stringify({
-        userId: user.id,
+        userId: user?.id,
         items: buildItems(),
         shippingAddress: buildShippingAddress(),
         country: form.country,
         currency,
+        couponCode: appliedCoupon?.code || null,
       }),
     });
 
@@ -286,7 +355,7 @@ export default function CheckoutPage() {
     sessionStorage.setItem("paypal_order_number", data.orderNumber);
 
     return data.paypalOrderId;
-  }, [user, form.country, currency, buildItems, buildShippingAddress, supabase]);
+  }, [user, form.country, currency, appliedCoupon, buildItems, buildShippingAddress, supabase]);
 
   const handlePayPalApprove = useCallback(async (data: { orderID: string }) => {
     const res = await fetch("/api/checkout/paypal/capture", {
@@ -333,16 +402,25 @@ export default function CheckoutPage() {
     };
   }, [paymentMethod, currency]);
 
-  // Render PayPal buttons when SDK is loaded and PayPal is selected
+  // Render PayPal buttons when SDK is loaded and PayPal is selected.
+  // Rebuild the button instance whenever the coupon or total changes so the
+  // latest discount is included in the PayPal order that gets created.
   useEffect(() => {
-    if (
-      paymentMethod !== "paypal" ||
-      !paypalScriptLoaded ||
-      !window.paypal ||
-      !paypalButtonsRef.current ||
-      paypalButtonsRendered.current
-    ) {
+    if (paymentMethod !== "paypal") {
+      paypalButtonsRendered.current = false;
+      if (paypalButtonsRef.current) {
+        paypalButtonsRef.current.innerHTML = "";
+      }
       return;
+    }
+
+    if (!paypalScriptLoaded || !window.paypal || !paypalButtonsRef.current) {
+      return;
+    }
+
+    if (paypalButtonsRendered.current) {
+      paypalButtonsRef.current.innerHTML = "";
+      paypalButtonsRendered.current = false;
     }
 
     paypalButtonsRendered.current = true;
@@ -389,17 +467,7 @@ export default function CheckoutPage() {
         setLoading(false);
       },
     }).render(paypalButtonsRef.current);
-  }, [paymentMethod, paypalScriptLoaded, handleCreatePayPalOrder, handlePayPalApprove]);
-
-  // Reset PayPal buttons when payment method changes
-  useEffect(() => {
-    if (paymentMethod !== "paypal") {
-      paypalButtonsRendered.current = false;
-      if (paypalButtonsRef.current) {
-        paypalButtonsRef.current.innerHTML = "";
-      }
-    }
-  }, [paymentMethod]);
+  }, [paymentMethod, paypalScriptLoaded, handleCreatePayPalOrder, handlePayPalApprove, appliedCoupon?.code, total]);
 
   const updateForm = (field: keyof ShippingForm, value: string) => {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -409,8 +477,7 @@ export default function CheckoutPage() {
     }
   };
 
-  if (authLoading) return (<div className="min-h-[60vh] flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>);
-  if (!user) return null;
+  // Guests and signed-in users both proceed — no auth gate.
   if (cartItems.length === 0) return (<div className="max-w-4xl mx-auto px-4 py-16 text-center"><ShoppingBag className="w-16 h-16 text-foreground/20 mx-auto mb-4" /><h1 className="text-2xl font-bold text-foreground mb-2">Your Cart is Empty</h1><p className="text-foreground/60 mb-6">Add some products before checking out.</p><Link href="/shop" className="btn-primary">Start Shopping</Link></div>);
 
   return (
@@ -781,8 +848,8 @@ export default function CheckoutPage() {
           )}
         </div>
 
-        {/* Order summary */}
-        <div className="lg:col-span-1">
+        {/* Order summary — first on mobile, right column on desktop */}
+        <div className="order-first lg:order-none lg:col-span-1">
           <div className="card sticky top-24">
             <h2 className="text-lg font-semibold text-foreground mb-4">
               Order Summary
@@ -803,11 +870,64 @@ export default function CheckoutPage() {
               ))}
             </div>
 
+            {/* Coupon code */}
+            <div className="border-t border-border pt-4 mb-4">
+              {appliedCoupon ? (
+                <div className="flex items-center justify-between bg-green-50 border border-green-200 rounded-lg px-3 py-2">
+                  <div className="text-sm">
+                    <span className="font-medium text-green-700">{appliedCoupon.code}</span>
+                    <span className="text-green-600"> — you save {formatPrice(appliedCoupon.discount, currency)}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={removeCoupon}
+                    className="text-xs font-medium text-red-600 hover:text-red-700"
+                  >
+                    Remove
+                  </button>
+                </div>
+              ) : (
+                <div>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={couponInput}
+                      onChange={(e) => setCouponInput(e.target.value.toUpperCase())}
+                      onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); applyCoupon(); } }}
+                      placeholder="Coupon code"
+                      className="flex-1 px-3 py-2 border border-border rounded-lg text-sm bg-white outline-none focus:border-primary"
+                    />
+                    <button
+                      type="button"
+                      onClick={applyCoupon}
+                      disabled={couponChecking || !couponInput.trim()}
+                      className="px-4 py-2 rounded-lg text-sm font-medium border border-primary text-primary hover:bg-primary/5 disabled:opacity-50"
+                    >
+                      {couponChecking ? "Checking..." : "Apply"}
+                    </button>
+                  </div>
+                </div>
+              )}
+              {couponMessage && (
+                <p className={`mt-2 text-xs ${couponMessage.type === "success" ? "text-green-600" : "text-red-600"}`}>
+                  {couponMessage.text}
+                </p>
+              )}
+            </div>
+
             <div className="border-t border-border pt-4 space-y-2 mb-4">
               <div className="flex justify-between text-sm">
                 <span className="text-foreground/60">Subtotal</span>
                 <span>{formatPrice(subtotal, currency)}</span>
               </div>
+              {appliedCoupon && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-foreground/60">Discount ({appliedCoupon.code})</span>
+                  <span className="text-green-600 font-medium">
+                    -{formatPrice(appliedCoupon.discount, currency)}
+                  </span>
+                </div>
+              )}
               <div className="flex justify-between text-sm">
                 <span className="text-foreground/60">Delivery</span>
                 <span

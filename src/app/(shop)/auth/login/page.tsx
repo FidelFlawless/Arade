@@ -40,7 +40,7 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
@@ -49,6 +49,15 @@ export default function LoginPage() {
         setError(error.message);
         setLoading(false);
         return;
+      }
+
+      // Claim any guest orders placed with this email before the account
+      // existed. Best-effort: never blocks the login flow.
+      if (data?.session?.access_token) {
+        fetch("/api/account/claim-guest-orders", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${data.session.access_token}` },
+        }).catch(() => {});
       }
 
       // Auth state will update → useEffect will redirect

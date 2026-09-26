@@ -7,7 +7,7 @@ const supabaseAdmin = createClient(
 );
 
 const BREVO_API_KEY = process.env.BREVO_API_KEY!;
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://aradeshop.com";
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://www.aradeshop.com";
 
 // Send abandoned cart email via Brevo transactional
 async function sendAbandonedCartEmail(
@@ -26,13 +26,13 @@ async function sendAbandonedCartEmail(
         (item) => `
         <tr>
           <td style="padding: 12px 0; border-bottom: 1px solid #f0ece4;">
-            <div style="display: flex; align-items: center; gap: 12px;">
-              ${item.image ? `<img src="${item.image}" alt="${item.name}" style="width: 60px; height: 60px; object-fit: cover; border-radius: 8px;" />` : ""}
-              <div>
+            <table style="border-collapse: collapse;"><tr>
+              ${item.image ? `<td style="padding: 0 12px 0 0; vertical-align: middle;"><img src="${item.image}" alt="${item.name}" style="width: 60px; height: 60px; object-fit: cover; border-radius: 8px; display: block;" /></td>` : ""}
+              <td style="padding: 0; vertical-align: middle;">
                 <p style="margin: 0; font-weight: 600; color: #1a1a2e; font-size: 14px;">${item.name}</p>
                 <p style="margin: 4px 0 0; color: #666; font-size: 13px;">Qty: ${item.quantity}</p>
-              </div>
-            </div>
+              </td>
+            </tr></table>
           </td>
           <td style="padding: 12px 0; border-bottom: 1px solid #f0ece4; text-align: right; font-weight: 600; color: #8B5E3C;">
             ${currencySymbol}${(item.price_cad * item.quantity).toFixed(2)}
@@ -48,6 +48,7 @@ async function sendAbandonedCartEmail(
     <body style="margin: 0; padding: 0; background-color: #faf8f5; font-family: 'Helvetica Neue', Arial, sans-serif;">
       <div style="max-width: 560px; margin: 0 auto; padding: 40px 20px;">
         <div style="text-align: center; margin-bottom: 32px;">
+          <img src="${SITE_URL}/icon.png" alt="Arade" width="72" height="72" style="display: block; margin: 0 auto 12px; border-radius: 16px;" />
           <h1 style="font-size: 24px; color: #1a1a2e; margin: 0 0 8px; font-weight: 700;">Arade</h1>
           <p style="color: #8B5E3C; font-size: 13px; letter-spacing: 2px; margin: 0; text-transform: uppercase;">Beauty · Skincare · Hair · Fashion</p>
         </div>
@@ -62,10 +63,12 @@ async function sendAbandonedCartEmail(
             ${productRows}
           </table>
 
-          <div style="margin-top: 24px; padding-top: 16px; border-top: 2px solid #f0ece4; display: flex; justify-content: space-between;">
-            <span style="font-weight: 700; color: #1a1a2e; font-size: 16px;">Total</span>
-            <span style="font-weight: 700; color: #8B5E3C; font-size: 16px;">${currencySymbol}${cartTotal.toFixed(2)}</span>
-          </div>
+          <table style="width: 100%; border-collapse: collapse; margin-top: 24px;">
+            <tr>
+              <td style="padding: 16px 0 0; border-top: 2px solid #f0ece4; font-weight: 700; color: #1a1a2e; font-size: 16px;">Total</td>
+              <td style="padding: 16px 0 0; border-top: 2px solid #f0ece4; font-weight: 700; color: #8B5E3C; font-size: 16px; text-align: right;">${currencySymbol}${cartTotal.toFixed(2)}</td>
+            </tr>
+          </table>
         </div>
 
         <div style="text-align: center; margin-bottom: 32px;">
@@ -87,7 +90,7 @@ async function sendAbandonedCartEmail(
         "api-key": BREVO_API_KEY,
       },
       body: JSON.stringify({
-        sender: { name: "Arade", email: "hello@aradeshop.com" },
+        sender: { name: "Arade", email: "support@aradeshop.com" },
         to: [{ email }],
         subject: "You left items in your cart",
         htmlContent,

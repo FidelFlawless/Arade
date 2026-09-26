@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useAuth } from "@/components/providers/AuthProvider";
 import { createClient } from "@/lib/supabase/client";
-import { Package, Loader2, ChevronRight } from "lucide-react";
+import { PackageCheck, Loader2, ChevronRight } from "lucide-react";
 import BackButton from "@/components/ui/BackButton";
 
 interface OrderRow {
@@ -89,7 +89,7 @@ export default function OrdersPage() {
 
       {orders.length === 0 ? (
         <div className="text-center py-16">
-          <Package className="w-16 h-16 text-foreground/20 mx-auto mb-4" />
+          <PackageCheck className="w-16 h-16 text-foreground/20 mx-auto mb-4" />
           <h3 className="text-lg font-medium text-foreground mb-2">
             No orders yet
           </h3>
@@ -116,7 +116,7 @@ export default function OrdersPage() {
                       className="w-full h-full object-contain"
                     />
                   ) : (
-                    <Package className="w-6 h-6 text-primary" />
+                    <PackageCheck className="w-6 h-6 text-primary" />
                   )}
                 </div>
                 <div className="min-w-0">

@@ -44,8 +44,8 @@ export default function ProductCard({ product }: { product: ProductCardProps }) 
   };
 
   return (
-    <div className="group card p-0 hover:shadow-lg">
-      <Link href={`/product/${product.slug}`}>
+    <div className="group product-card hover:shadow-lg">
+      <Link href={`/product/${product.slug}`} className="block">
         <div className="aspect-square bg-white relative overflow-hidden rounded-t-lg">
           {product.images && product.images[0] ? (
             <Image
@@ -55,8 +55,8 @@ export default function ProductCard({ product }: { product: ProductCardProps }) 
               sizes="(min-width: 1024px) 25vw, (min-width: 640px) 33vw, 50vw"
               loading="lazy"
               decoding="async"
-              style={{ objectFit: "contain" }}
-              className="group-hover:scale-105 transition-transform duration-300 p-1"
+              style={{ objectFit: "cover" }}
+              className="group-hover:scale-105 transition-transform duration-300"
             />
           ) : (
             <div className="w-full h-full flex items-center justify-center text-foreground/30">No Image</div>

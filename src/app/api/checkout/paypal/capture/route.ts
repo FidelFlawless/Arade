@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { sendOrderConfirmationEmail } from "@/lib/emails";
+import { recordCouponUsage } from "@/lib/coupons";
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -201,6 +202,21 @@ export async function POST(req: NextRequest) {
 
     // 7. Mark order as paid
     const captureId = purchaseUnit?.payments?.captures?.[0]?.id || "";
+
+    // Count coupon usage (paid orders only). Best-effort: fetch the code
+    // from the order row since PayPal doesn't carry it in metadata.
+    (async () => {
+      try {
+        const { data: paidOrder } = await supabaseAdmin
+          .from("orders")
+          .select("coupon_code")
+          .eq("id", order.id)
+          .single();
+        if (paidOrder?.coupon_code) await recordCouponUsage(paidOrder.coupon_code);
+      } catch (err) {
+        console.error("Coupon usage recording failed:", err);
+      }
+    })();
 
     if (!captureId) {
       console.error("PayPal capture response did not include a capture ID:", captureData);

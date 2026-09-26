@@ -5,14 +5,12 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Trash2, Plus, Minus, ShoppingBag, ArrowLeft, Loader2, Package, Lock, Truck } from "lucide-react";
 import { useCart } from "@/components/providers/CartProvider";
-import { useAuth } from "@/components/providers/AuthProvider";
 import { formatPrice, calculateDeliveryFee } from "@/lib/utils";
 import { FREE_DELIVERY_THRESHOLD } from "@/lib/constants";
 import BackButton from "@/components/ui/BackButton";
 
 export default function CartPage() {
   const router = useRouter();
-  const { user } = useAuth();
   const { items: cartItems, removeFromCart, updateQuantity } = useCart();
   const [country, setCountry] = useState<"CA" | "US">("CA");
   const [updating, setUpdating] = useState<string | null>(null);
@@ -208,13 +206,7 @@ export default function CartPage() {
             </div>
 
             <button
-              onClick={() => {
-                if (!user) {
-                  router.push("/auth/login?redirect=/checkout");
-                } else {
-                  router.push("/checkout");
-                }
-              }}
+              onClick={() => router.push("/checkout")}
               className="btn-primary w-full flex items-center justify-center gap-2"
             >
               Proceed to Checkout

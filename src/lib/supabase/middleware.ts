@@ -73,15 +73,9 @@ export async function updateSession(request: NextRequest) {
     }
   }
 
-  // Protect checkout
-  if (request.nextUrl.pathname.startsWith("/checkout")) {
-    if (!user) {
-      const url = request.nextUrl.clone();
-      url.pathname = "/auth/login";
-      url.searchParams.set("redirect", "/checkout");
-      return NextResponse.redirect(url);
-    }
-  }
+  // Checkout is open to guests (guest checkout) — the checkout page and the
+  // payment APIs enforce address validation and server-side pricing, so no
+  // auth gate is needed here anymore.
 
   return supabaseResponse;
 }

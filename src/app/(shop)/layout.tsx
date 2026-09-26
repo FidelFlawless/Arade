@@ -3,6 +3,7 @@ import Footer from "@/components/layout/Footer";
 import { AuthProvider } from "@/components/providers/AuthProvider";
 import { CartProvider } from "@/components/providers/CartProvider";
 import WhatsAppButton from "@/components/ui/WhatsAppButton";
+import WelcomePromoModal from "@/components/promo/WelcomePromoModal";
 
 export default function ShopLayout({
   children,
@@ -17,6 +18,7 @@ export default function ShopLayout({
           <main className="flex-1">{children}</main>
           <Footer />
           <WhatsAppButton />
+          <WelcomePromoModal />
         </div>
       </CartProvider>
     </AuthProvider>

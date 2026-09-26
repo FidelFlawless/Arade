@@ -13,6 +13,8 @@ interface Order {
   payment_status: string;
   created_at: string;
   profiles: { full_name: string; email: string } | null;
+  shipping_email: string | null;
+  coupon_code: string | null;
   order_items: { id: string }[];
 }
 
@@ -52,7 +54,8 @@ export default function AdminOrdersPage() {
   const filteredOrders = orders.filter((order) => {
     const q = search.toLowerCase();
     const matchesSearch = order.order_number?.toLowerCase().includes(q) ||
-      order.profiles?.full_name?.toLowerCase().includes(q) || order.profiles?.email?.toLowerCase().includes(q);
+      order.profiles?.full_name?.toLowerCase().includes(q) || order.profiles?.email?.toLowerCase().includes(q) ||
+      order.shipping_email?.toLowerCase().includes(q);
     const matchesStatus = statusFilter === "all" || order.order_status === statusFilter;
     return matchesSearch && matchesStatus;
   });
@@ -111,8 +114,11 @@ export default function AdminOrdersPage() {
                       </Link>
                     </td>
                     <td className="p-4">
-                      <p className="text-sm font-medium">{order.profiles?.full_name || "—"}</p>
-                      <p className="text-xs text-foreground/50">{order.profiles?.email || ""}</p>
+                      <p className="text-sm font-medium">{order.profiles?.full_name || (order.shipping_email ? "Guest" : "—")}</p>
+                      <p className="text-xs text-foreground/50">{order.profiles?.email || order.shipping_email || ""}</p>
+                      {order.coupon_code && (
+                        <p className="text-xs text-green-600 mt-0.5">Coupon: {order.coupon_code}</p>
+                      )}
                     </td>
                     <td className="p-4 text-sm text-foreground/70">
                       {new Date(order.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}

@@ -7,6 +7,7 @@ import {
   isValidShippingRegion,
 } from "@/lib/utils";
 import { DELIVERY_FEE_CAD, DELIVERY_FEE_USD } from "@/lib/constants";
+import { validateCoupon, recordCouponUsage } from "@/lib/coupons";
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -45,21 +46,26 @@ async function getPayPalAccessToken(): Promise<string> {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { userId, items, shippingAddress, country, currency } = body;
+    const { userId, items, shippingAddress, country, currency, couponCode } = body;
 
-    // 1. Verify user exists
-    if (!userId) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const { data: profile } = await supabaseAdmin
-      .from("profiles")
-      .select("id")
-      .eq("id", userId)
-      .single();
-
-    if (!profile) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    // 1. Guest checkout: authentication is OPTIONAL. If a userId and bearer
+    // token are provided, verify the token actually belongs to that user
+    // (never trust the body alone). Guests proceed without either.
+    const authHeader = req.headers.get("authorization");
+    if (userId) {
+      if (!authHeader) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      }
+      const token = authHeader.replace(/^Bearer\s+/i, "");
+      const supabaseAuth = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      );
+      // Pass the JWT explicitly - global headers are not honoured by getUser()
+      const { data: { user }, error: authError } = await supabaseAuth.auth.getUser(token);
+      if (authError || !user || user.id !== userId) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      }
     }
 
     // 2. Validate inputs
@@ -175,21 +181,38 @@ export async function POST(req: NextRequest) {
 
     const total = subtotal + deliveryFee;
 
+    // 5b. Coupon: validate server-side against the server-calculated subtotal.
+    let discount = 0;
+    let appliedCouponCode: string | null = null;
+    if (couponCode && typeof couponCode === "string") {
+      const couponResult = await validateCoupon(couponCode, currency, subtotal);
+      if (!couponResult.ok) {
+        return NextResponse.json({ error: couponResult.error || "Invalid coupon" }, { status: 400 });
+      }
+      discount = couponResult.discount || 0;
+      appliedCouponCode = couponResult.code || null;
+    }
+
+    const payableSubtotal = Math.max(0, Math.round((subtotal - discount) * 100) / 100);
+    const grandTotal = Math.round((payableSubtotal + deliveryFee) * 100) / 100;
+
     // 6. Create a pending order in our database
     const orderNumber = `ARD-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
 
     const { data: order, error: orderError } = await supabaseAdmin
       .from("orders")
       .insert({
-        user_id: userId,
+        user_id: userId || null,
         order_number: orderNumber,
         subtotal,
         delivery_fee: deliveryFee,
-        discount: 0,
-        total,
+        discount,
+        total: grandTotal,
         currency,
         payment_status: "pending",
         order_status: "pending",
+        shipping_email: shippingAddress.email || null,
+        coupon_code: appliedCouponCode,
         shipping_first_name: shippingAddress.first_name,
         shipping_last_name: shippingAddress.last_name,
         shipping_phone: shippingAddress.phone || null,
@@ -248,14 +271,15 @@ export async function POST(req: NextRequest) {
       purchase_units: [
         {
           reference_id: order.order_number,
+          custom_id: order.id,
           description: `Arade Order ${order.order_number}`.substring(0, 127),
           amount: {
             currency_code: currency,
-            value: total.toFixed(2),
+            value: grandTotal.toFixed(2),
             breakdown: {
               item_total: {
                 currency_code: currency,
-                value: subtotal.toFixed(2),
+                value: payableSubtotal.toFixed(2),
               },
               shipping: {
                 currency_code: currency,
@@ -267,7 +291,15 @@ export async function POST(req: NextRequest) {
             name: item.name.substring(0, 127),
             unit_amount: {
               currency_code: currency,
-              value: item.serverPrice.toFixed(2),
+              // Discount spread proportionally across item lines so the
+              // item_total matches what the order records.
+              value: (
+                Math.round(
+                  item.serverPrice *
+                    (1 - (subtotal > 0 ? Math.min(1, discount / subtotal) : 0)) *
+                    100
+                ) / 100
+              ).toFixed(2),
             },
             quantity: item.quantity.toString(),
             category: "PHYSICAL_GOODS",

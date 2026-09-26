@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 import { createClient } from "@supabase/supabase-js";
 import { sendOrderConfirmationEmail } from "@/lib/emails";
+import { recordCouponUsage } from "@/lib/coupons";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
@@ -84,6 +85,11 @@ export async function POST(req: NextRequest) {
     }
 
     console.log(`Order ${orderId} marked as PAID via webhook`);
+
+    // Count coupon usage only on successful payment (fire-and-forget)
+    if (session.metadata?.coupon_code) {
+      recordCouponUsage(session.metadata.coupon_code);
+    }
 
     // Send the order confirmation email (fire-and-forget; never blocks the webhook)
     sendOrderConfirmationEmail(orderId).then((sent) => {

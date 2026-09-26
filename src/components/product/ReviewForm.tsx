@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { useAuth } from "@/components/providers/AuthProvider";
-import Link from "next/link";
 import { Star, Send, Loader2, CheckCircle } from "lucide-react";
 
 interface ReviewFormProps {
@@ -12,6 +11,7 @@ interface ReviewFormProps {
 
 export default function ReviewForm({ productId }: ReviewFormProps) {
   const { user, loading: authLoading } = useAuth();
+  const [name, setName] = useState(user?.user_metadata?.full_name || user?.email?.split("@")[0] || "");
   const [rating, setRating] = useState(0);
   const [hoveredRating, setHoveredRating] = useState(0);
   const [comment, setComment] = useState("");
@@ -23,8 +23,8 @@ export default function ReviewForm({ productId }: ReviewFormProps) {
     e.preventDefault();
     setError(null);
 
-    if (!user) {
-      setError("Please sign in to leave a review.");
+    if (!user && !name.trim()) {
+      setError("Please enter your name to leave a review.");
       return;
     }
 
@@ -40,7 +40,9 @@ export default function ReviewForm({ productId }: ReviewFormProps) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          user_id: user.id,
+          user_id: user?.id ?? null,
+          reviewer_name: name.trim() || user?.user_metadata?.full_name || "Guest",
+          reviewer_email: user?.email ?? null,
           product_id: productId,
           rating,
           comment,
@@ -65,20 +67,6 @@ export default function ReviewForm({ productId }: ReviewFormProps) {
     return null;
   }
 
-  if (!user) {
-    return (
-      <div className="bg-muted rounded-xl p-6 text-center">
-        <p className="text-foreground/70 mb-3">Sign in to leave a review</p>
-        <Link
-          href="/auth/login"
-          className="inline-flex items-center gap-2 bg-primary text-white px-5 py-2.5 rounded-lg font-medium hover:bg-primary/90 transition-colors"
-        >
-          Sign In
-        </Link>
-      </div>
-    );
-  }
-
   if (submitted) {
     return (
       <div className="bg-green-50 border border-green-200 rounded-xl p-6 text-center">
@@ -94,8 +82,24 @@ export default function ReviewForm({ productId }: ReviewFormProps) {
   return (
     <div className="bg-muted rounded-xl p-6">
       <h3 className="font-semibold text-foreground mb-4">Write a Review</h3>
-      
+
       <form onSubmit={handleSubmit} className="space-y-4">
+        {!user && (
+          <div>
+            <label htmlFor="reviewer-name" className="block text-sm font-medium text-foreground/70 mb-2">
+              Your name
+            </label>
+            <input
+              id="reviewer-name"
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Enter your name"
+              className="w-full px-4 py-3 rounded-lg border border-border bg-white text-foreground placeholder:text-foreground/40 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary"
+            />
+          </div>
+        )}
+
         {/* Star Rating */}
         <div>
           <label className="block text-sm font-medium text-foreground/70 mb-2">

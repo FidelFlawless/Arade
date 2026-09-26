@@ -311,9 +311,43 @@ export interface Order {
   updated_at: string;
 }
 
+export interface Coupon {
+  id: string;
+  code: string;
+  description: string | null;
+  discount_type: "percent" | "fixed";
+  discount_value_cad: number;
+  discount_value_usd: number | null;
+  min_subtotal_cad: number;
+  min_subtotal_usd: number;
+  max_uses: number | null;
+  used_count: number;
+  active: boolean;
+  expires_at: string | null;
+  first_order_only: boolean;
+  expires_days_after_signup: number | null;
+  created_at: string;
+}
+
+export interface CouponInsert {
+  id?: string;
+  code: string;
+  description?: string | null;
+  discount_type: "percent" | "fixed";
+  discount_value_cad: number;
+  discount_value_usd?: number | null;
+  min_subtotal_cad?: number;
+  min_subtotal_usd?: number;
+  max_uses?: number | null;
+  active?: boolean;
+  expires_at?: string | null;
+  first_order_only?: boolean;
+  expires_days_after_signup?: number | null;
+}
+
 export interface OrderInsert {
   id?: string;
-  user_id: string;
+  user_id?: string | null;
   order_number: string;
   status?: "pending" | "processing" | "shipped" | "delivered" | "cancelled";
   subtotal: number;
@@ -416,12 +450,14 @@ export interface PaymentUpdate {
 // ---- Reviews ----
 export interface Review {
   id: string;
-  user_id: string;
+  user_id: string | null;
   product_id: string;
-  order_id: string;
+  order_id: string | null;
   rating: number;
   title: string | null;
   comment: string | null;
+  reviewer_name?: string | null;
+  reviewer_email?: string | null;
   is_verified: boolean;
   is_approved: boolean;
   created_at: string;
@@ -430,12 +466,14 @@ export interface Review {
 
 export interface ReviewInsert {
   id?: string;
-  user_id: string;
+  user_id: string | null;
   product_id: string;
-  order_id: string;
+  order_id?: string | null;
   rating: number;
   title?: string | null;
   comment?: string | null;
+  reviewer_name?: string | null;
+  reviewer_email?: string | null;
   is_verified?: boolean;
   is_approved?: boolean;
   created_at?: string;

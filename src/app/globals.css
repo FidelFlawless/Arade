@@ -40,16 +40,25 @@ body {
 }
 
 /* Keep buttons, nav, inputs, and small UI text in sans-serif */
-button, input, select, textarea, nav, label, span, a, p, li {
+button,
+input,
+select,
+textarea,
+nav,
+label,
+span,
+a,
+p,
+li {
   font-family: var(--font-sans), Arial, sans-serif;
 }
 
 /* Headings use Playfair Display serif font */
-h1, h2, h3 {
+h1,
+h2,
+h3 {
   font-family: var(--font-serif), Georgia, serif;
 }
-
-
 
 /* Custom scrollbar */
 ::-webkit-scrollbar {
@@ -97,6 +106,34 @@ html {
   @apply bg-white rounded-xl shadow-sm border border-border p-6 transition-shadow duration-200 hover:shadow-md;
 }
 
+.product-card {
+  @apply bg-white rounded-xl shadow-sm border border-border overflow-hidden transition-shadow duration-200 hover:shadow-md;
+}
+
+.invoice-print {
+  display: none;
+}
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+
+  .invoice-print,
+  .invoice-print * {
+    visibility: visible;
+  }
+
+  .invoice-print {
+    display: block;
+    position: absolute;
+    inset: 0;
+    padding: 2rem;
+    background: white;
+    color: black;
+  }
+}
+
 /* Input styles - plain CSS to avoid Tailwind v4 layer conflicts */
 .input {
   width: 100%;
@@ -107,7 +144,9 @@ html {
   line-height: 1.5;
   color: var(--foreground);
   background-color: white;
-  transition: border-color 0.2s, box-shadow 0.2s;
+  transition:
+    border-color 0.2s,
+    box-shadow 0.2s;
 }
 .input::placeholder {
   color: var(--foreground);
@@ -156,86 +195,219 @@ html {
    Modern browsers skip this entire block.
    ───────────────────────────────────────────────────────────── */
 @supports not (color: color-mix(in lab, red, red)) {
-
   /* Text colors */
-  .text-foreground\/15 { color: rgba(44, 24, 16, 0.15); }
-  .text-foreground\/20 { color: rgba(44, 24, 16, 0.2); }
-  .text-foreground\/30 { color: rgba(44, 24, 16, 0.3); }
-  .text-foreground\/40 { color: rgba(44, 24, 16, 0.4); }
-  .text-foreground\/50 { color: rgba(44, 24, 16, 0.5); }
-  .text-foreground\/60 { color: rgba(44, 24, 16, 0.6); }
-  .text-foreground\/70 { color: rgba(44, 24, 16, 0.7); }
-  .text-primary\/80 { color: rgba(139, 94, 60, 0.8); }
-  .text-white\/30 { color: rgba(255, 255, 255, 0.3); }
-  .text-white\/40 { color: rgba(255, 255, 255, 0.4); }
-  .text-white\/50 { color: rgba(255, 255, 255, 0.5); }
-  .text-white\/60 { color: rgba(255, 255, 255, 0.6); }
-  .text-white\/70 { color: rgba(255, 255, 255, 0.7); }
-  .text-white\/80 { color: rgba(255, 255, 255, 0.8); }
-  .text-white\/90 { color: rgba(255, 255, 255, 0.9); }
+  .text-foreground\/15 {
+    color: rgba(44, 24, 16, 0.15);
+  }
+  .text-foreground\/20 {
+    color: rgba(44, 24, 16, 0.2);
+  }
+  .text-foreground\/30 {
+    color: rgba(44, 24, 16, 0.3);
+  }
+  .text-foreground\/40 {
+    color: rgba(44, 24, 16, 0.4);
+  }
+  .text-foreground\/50 {
+    color: rgba(44, 24, 16, 0.5);
+  }
+  .text-foreground\/60 {
+    color: rgba(44, 24, 16, 0.6);
+  }
+  .text-foreground\/70 {
+    color: rgba(44, 24, 16, 0.7);
+  }
+  .text-primary\/80 {
+    color: rgba(139, 94, 60, 0.8);
+  }
+  .text-white\/30 {
+    color: rgba(255, 255, 255, 0.3);
+  }
+  .text-white\/40 {
+    color: rgba(255, 255, 255, 0.4);
+  }
+  .text-white\/50 {
+    color: rgba(255, 255, 255, 0.5);
+  }
+  .text-white\/60 {
+    color: rgba(255, 255, 255, 0.6);
+  }
+  .text-white\/70 {
+    color: rgba(255, 255, 255, 0.7);
+  }
+  .text-white\/80 {
+    color: rgba(255, 255, 255, 0.8);
+  }
+  .text-white\/90 {
+    color: rgba(255, 255, 255, 0.9);
+  }
 
   /* Backgrounds */
-  .bg-black\/5 { background-color: rgba(0, 0, 0, 0.05); }
-  .bg-black\/40 { background-color: rgba(0, 0, 0, 0.4); }
-  .bg-black\/50 { background-color: rgba(0, 0, 0, 0.5); }
-  .bg-foreground\/5 { background-color: rgba(44, 24, 16, 0.05); }
-  .bg-foreground\/10 { background-color: rgba(44, 24, 16, 0.1); }
-  .bg-muted\/30 { background-color: rgba(248, 244, 240, 0.3); }
-  .bg-muted\/50 { background-color: rgba(248, 244, 240, 0.5); }
-  .bg-muted\/80 { background-color: rgba(248, 244, 240, 0.8); }
-  .bg-primary\/5 { background-color: rgba(139, 94, 60, 0.05); }
-  .bg-primary\/10 { background-color: rgba(139, 94, 60, 0.1); }
-  .bg-primary\/20 { background-color: rgba(139, 94, 60, 0.2); }
-  .bg-primary\/70 { background-color: rgba(139, 94, 60, 0.7); }
-  .bg-primary\/90 { background-color: rgba(139, 94, 60, 0.9); }
-  .bg-white\/10 { background-color: rgba(255, 255, 255, 0.1); }
-  .bg-white\/20 { background-color: rgba(255, 255, 255, 0.2); }
-  .bg-white\/80 { background-color: rgba(255, 255, 255, 0.8); }
-  .bg-white\/90 { background-color: rgba(255, 255, 255, 0.9); }
-  .bg-white\/95 { background-color: rgba(255, 255, 255, 0.95); }
-  .bg-green-50\/30 { background-color: rgba(240, 253, 244, 0.3); }
-  .bg-yellow-50\/30 { background-color: rgba(254, 252, 232, 0.3); }
+  .bg-black\/5 {
+    background-color: rgba(0, 0, 0, 0.05);
+  }
+  .bg-black\/40 {
+    background-color: rgba(0, 0, 0, 0.4);
+  }
+  .bg-black\/50 {
+    background-color: rgba(0, 0, 0, 0.5);
+  }
+  .bg-foreground\/5 {
+    background-color: rgba(44, 24, 16, 0.05);
+  }
+  .bg-foreground\/10 {
+    background-color: rgba(44, 24, 16, 0.1);
+  }
+  .bg-muted\/30 {
+    background-color: rgba(248, 244, 240, 0.3);
+  }
+  .bg-muted\/50 {
+    background-color: rgba(248, 244, 240, 0.5);
+  }
+  .bg-muted\/80 {
+    background-color: rgba(248, 244, 240, 0.8);
+  }
+  .bg-primary\/5 {
+    background-color: rgba(139, 94, 60, 0.05);
+  }
+  .bg-primary\/10 {
+    background-color: rgba(139, 94, 60, 0.1);
+  }
+  .bg-primary\/20 {
+    background-color: rgba(139, 94, 60, 0.2);
+  }
+  .bg-primary\/70 {
+    background-color: rgba(139, 94, 60, 0.7);
+  }
+  .bg-primary\/90 {
+    background-color: rgba(139, 94, 60, 0.9);
+  }
+  .bg-white\/10 {
+    background-color: rgba(255, 255, 255, 0.1);
+  }
+  .bg-white\/20 {
+    background-color: rgba(255, 255, 255, 0.2);
+  }
+  .bg-white\/80 {
+    background-color: rgba(255, 255, 255, 0.8);
+  }
+  .bg-white\/90 {
+    background-color: rgba(255, 255, 255, 0.9);
+  }
+  .bg-white\/95 {
+    background-color: rgba(255, 255, 255, 0.95);
+  }
+  .bg-green-50\/30 {
+    background-color: rgba(240, 253, 244, 0.3);
+  }
+  .bg-yellow-50\/30 {
+    background-color: rgba(254, 252, 232, 0.3);
+  }
 
   /* Borders */
-  .border-foreground\/20 { border-color: rgba(44, 24, 16, 0.2); }
-  .border-primary\/30 { border-color: rgba(139, 94, 60, 0.3); }
-  .border-primary\/50 { border-color: rgba(139, 94, 60, 0.5); }
-  .border-white\/10 { border-color: rgba(255, 255, 255, 0.1); }
-  .border-white\/30 { border-color: rgba(255, 255, 255, 0.3); }
+  .border-foreground\/20 {
+    border-color: rgba(44, 24, 16, 0.2);
+  }
+  .border-primary\/30 {
+    border-color: rgba(139, 94, 60, 0.3);
+  }
+  .border-primary\/50 {
+    border-color: rgba(139, 94, 60, 0.5);
+  }
+  .border-white\/10 {
+    border-color: rgba(255, 255, 255, 0.1);
+  }
+  .border-white\/30 {
+    border-color: rgba(255, 255, 255, 0.3);
+  }
 
   /* Placeholder colors */
-  .placeholder-foreground\/40::placeholder { color: rgba(44, 24, 16, 0.4); }
-  .placeholder-white\/60::placeholder { color: rgba(255, 255, 255, 0.6); }
+  .placeholder-foreground\/40::placeholder {
+    color: rgba(44, 24, 16, 0.4);
+  }
+  .placeholder-white\/60::placeholder {
+    color: rgba(255, 255, 255, 0.6);
+  }
 
   /* Rings (old Safari has no ring machinery — use plain box-shadow) */
-  .ring-primary\/20 { box-shadow: 0 0 0 3px rgba(139, 94, 60, 0.2); }
-  .ring-primary\/50 { box-shadow: 0 0 0 3px rgba(139, 94, 60, 0.5); }
-  .ring-white\/40 { box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.4); }
+  .ring-primary\/20 {
+    box-shadow: 0 0 0 3px rgba(139, 94, 60, 0.2);
+  }
+  .ring-primary\/50 {
+    box-shadow: 0 0 0 3px rgba(139, 94, 60, 0.5);
+  }
+  .ring-white\/40 {
+    box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.4);
+  }
 
   /* Hover variants */
-  .hover\:bg-black\/5:hover { background-color: rgba(0, 0, 0, 0.05); }
-  .hover\:bg-foreground\/10:hover { background-color: rgba(44, 24, 16, 0.1); }
-  .hover\:bg-muted\/30:hover { background-color: rgba(248, 244, 240, 0.3); }
-  .hover\:bg-muted\/80:hover { background-color: rgba(248, 244, 240, 0.8); }
-  .hover\:bg-primary\/5:hover { background-color: rgba(139, 94, 60, 0.05); }
-  .hover\:bg-primary\/10:hover { background-color: rgba(139, 94, 60, 0.1); }
-  .hover\:bg-primary\/20:hover { background-color: rgba(139, 94, 60, 0.2); }
-  .hover\:bg-primary\/90:hover { background-color: rgba(139, 94, 60, 0.9); }
-  .hover\:bg-white\/10:hover { background-color: rgba(255, 255, 255, 0.1); }
-  .hover\:bg-white\/90:hover { background-color: rgba(255, 255, 255, 0.9); }
-  .hover\:border-foreground\/20:hover { border-color: rgba(44, 24, 16, 0.2); }
-  .hover\:border-primary\/50:hover { border-color: rgba(139, 94, 60, 0.5); }
-  .hover\:text-foreground\/60:hover { color: rgba(44, 24, 16, 0.6); }
-  .hover\:text-primary\/80:hover { color: rgba(139, 94, 60, 0.8); }
+  .hover\:bg-black\/5:hover {
+    background-color: rgba(0, 0, 0, 0.05);
+  }
+  .hover\:bg-foreground\/10:hover {
+    background-color: rgba(44, 24, 16, 0.1);
+  }
+  .hover\:bg-muted\/30:hover {
+    background-color: rgba(248, 244, 240, 0.3);
+  }
+  .hover\:bg-muted\/80:hover {
+    background-color: rgba(248, 244, 240, 0.8);
+  }
+  .hover\:bg-primary\/5:hover {
+    background-color: rgba(139, 94, 60, 0.05);
+  }
+  .hover\:bg-primary\/10:hover {
+    background-color: rgba(139, 94, 60, 0.1);
+  }
+  .hover\:bg-primary\/20:hover {
+    background-color: rgba(139, 94, 60, 0.2);
+  }
+  .hover\:bg-primary\/90:hover {
+    background-color: rgba(139, 94, 60, 0.9);
+  }
+  .hover\:bg-white\/10:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+  }
+  .hover\:bg-white\/90:hover {
+    background-color: rgba(255, 255, 255, 0.9);
+  }
+  .hover\:border-foreground\/20:hover {
+    border-color: rgba(44, 24, 16, 0.2);
+  }
+  .hover\:border-primary\/50:hover {
+    border-color: rgba(139, 94, 60, 0.5);
+  }
+  .hover\:text-foreground\/60:hover {
+    color: rgba(44, 24, 16, 0.6);
+  }
+  .hover\:text-primary\/80:hover {
+    color: rgba(139, 94, 60, 0.8);
+  }
 
   /* Focus variants */
-  .focus\:ring-primary\/20:focus { box-shadow: 0 0 0 3px rgba(139, 94, 60, 0.2); }
-  .focus\:ring-primary\/50:focus { box-shadow: 0 0 0 3px rgba(139, 94, 60, 0.5); }
-  .focus\:ring-white\/40:focus { box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.4); }
-  .focus\:ring-error\/20:focus { box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.2); }
+  .focus\:ring-primary\/20:focus {
+    box-shadow: 0 0 0 3px rgba(139, 94, 60, 0.2);
+  }
+  .focus\:ring-primary\/50:focus {
+    box-shadow: 0 0 0 3px rgba(139, 94, 60, 0.5);
+  }
+  .focus\:ring-white\/40:focus {
+    box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.4);
+  }
+  .focus\:ring-error\/20:focus {
+    box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.2);
+  }
 
   /* Buttons composed with @apply that use opacity variants */
-  .btn-primary:hover { background-color: rgba(107, 66, 38, 1); }
-  .btn-outline:hover { background-color: rgba(139, 94, 60, 1); color: #ffffff; }
-  .btn-secondary:hover { background-color: rgba(212, 165, 116, 1); color: #ffffff; }
+  .btn-primary:hover {
+    background-color: rgba(107, 66, 38, 1);
+  }
+  .btn-outline:hover {
+    background-color: rgba(139, 94, 60, 1);
+    color: #ffffff;
+  }
+  .btn-secondary:hover {
+    background-color: rgba(212, 165, 116, 1);
+    color: #ffffff;
+  }
 }

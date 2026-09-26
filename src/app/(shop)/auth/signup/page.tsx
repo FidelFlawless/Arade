@@ -43,7 +43,7 @@ export default function SignupPage() {
     setLoading(true);
 
     try {
-      const { error } = await supabase.auth.signUp({
+      const { data: signUpData, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
@@ -57,6 +57,23 @@ export default function SignupPage() {
         setError(error.message);
         return;
       }
+
+      // Link any guest orders placed with this email before signup.
+      // Best-effort: never blocks the signup flow.
+      if (signUpData?.session?.access_token) {
+        fetch("/api/account/claim-guest-orders", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${signUpData.session.access_token}` },
+        }).catch(() => {});
+      }
+
+      // Welcome email with the first-order discount code. Best-effort:
+      // failure must never block or break signup.
+      fetch("/api/emails/welcome", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email, firstName: fullName.split(" ")[0] || "" }),
+      }).catch(() => {});
 
       setSuccess(true);
     } catch {

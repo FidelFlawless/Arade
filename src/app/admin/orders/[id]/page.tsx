@@ -2,7 +2,7 @@
 
 import { useState, useEffect, use } from "react";
 import Link from "next/link";
-import { ArrowLeft, Loader2, ChevronDown, Package } from "lucide-react";
+import { ArrowLeft, Loader2, ChevronDown, Package, Printer } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
 interface OrderDetail {
@@ -27,6 +27,7 @@ interface OrderDetail {
   } | null;
   country: string;
   created_at: string;
+  shipping_email: string | null;
   profiles: { full_name: string; email: string } | null;
   order_items: {
     id: string;
@@ -135,6 +136,16 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
           </p>
         </div>
         <div className="flex items-center gap-3">
+          {order.payment_status === "paid" && (
+            <button
+              type="button"
+              onClick={() => window.print()}
+              className="inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-dark"
+            >
+              <Printer className="h-4 w-4" />
+              Print Invoice
+            </button>
+          )}
           <span className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${statusColors[order.order_status] || "bg-gray-100"}`}>
             {order.order_status?.charAt(0).toUpperCase() + order.order_status?.slice(1)}
           </span>
@@ -278,6 +289,68 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
           </div>
         </div>
       </div>
+
+      {order.payment_status === "paid" && (
+        <section className="invoice-print" aria-label="Printable invoice">
+          <div className="flex items-start justify-between border-b-2 border-black pb-6">
+            <div>
+              <h1 className="text-3xl font-bold">Arade</h1>
+              <p className="mt-1 text-sm">Beauty, skincare, hair and fashion</p>
+            </div>
+            <div className="text-right">
+              <h2 className="text-2xl font-bold">INVOICE</h2>
+              <p className="mt-1 text-sm">{order.order_number || order.id.slice(0, 8)}</p>
+              <p className="text-sm">{new Date(order.created_at).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}</p>
+            </div>
+          </div>
+
+          <div className="mt-8 grid grid-cols-2 gap-8 text-sm">
+            <div>
+              <h3 className="mb-2 font-bold uppercase tracking-wide">Bill to</h3>
+              <p>{order.profiles?.full_name || `${shipping.first_name || "Guest"} ${shipping.last_name || ""}`}</p>
+              <p>{order.profiles?.email || order.shipping_email || "-"}</p>
+            </div>
+            <div>
+              <h3 className="mb-2 font-bold uppercase tracking-wide">Ship to</h3>
+              <p>{shipping.first_name} {shipping.last_name}</p>
+              <p>{shipping.address_line1}</p>
+              {shipping.address_line2 && <p>{shipping.address_line2}</p>}
+              <p>{shipping.city}, {shipping.province_state} {shipping.postal_code}</p>
+              <p>{order.country === "CA" ? "Canada" : "United States"}</p>
+            </div>
+          </div>
+
+          <table className="mt-10 w-full border-collapse text-sm">
+            <thead>
+              <tr className="border-b-2 border-black text-left">
+                <th className="py-3">Product</th>
+                <th className="py-3 text-right">Qty</th>
+                <th className="py-3 text-right">Price</th>
+                <th className="py-3 text-right">Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              {order.order_items.map((item) => (
+                <tr key={item.id} className="border-b border-gray-300">
+                  <td className="py-3">{item.product_name}</td>
+                  <td className="py-3 text-right">{item.quantity}</td>
+                  <td className="py-3 text-right">{order.currency === "CAD" ? "C$" : "US$"}{Number(item.unit_price).toFixed(2)}</td>
+                  <td className="py-3 text-right">{order.currency === "CAD" ? "C$" : "US$"}{Number(item.subtotal).toFixed(2)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+
+          <div className="mt-8 ml-auto w-64 space-y-2 text-sm">
+            <div className="flex justify-between"><span>Subtotal</span><span>{order.currency === "CAD" ? "C$" : "US$"}{Number(order.subtotal).toFixed(2)}</span></div>
+            {Number(order.discount) > 0 && <div className="flex justify-between"><span>Discount</span><span>-{order.currency === "CAD" ? "C$" : "US$"}{Number(order.discount).toFixed(2)}</span></div>}
+            <div className="flex justify-between"><span>Delivery</span><span>{Number(order.delivery_fee) === 0 ? "Free" : `${order.currency === "CAD" ? "C$" : "US$"}${Number(order.delivery_fee).toFixed(2)}`}</span></div>
+            <div className="flex justify-between border-t-2 border-black pt-3 text-base font-bold"><span>Total paid</span><span>{order.currency === "CAD" ? "C$" : "US$"}{Number(order.total).toFixed(2)}</span></div>
+          </div>
+
+          <p className="mt-12 border-t border-gray-300 pt-4 text-center text-xs">Payment status: Paid. Thank you for shopping with Arade.</p>
+        </section>
+      )}
     </div>
   );
 }

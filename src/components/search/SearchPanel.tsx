@@ -26,9 +26,33 @@ export default function SearchPanel({ isOpen, onClose }: SearchPanelProps) {
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
+  // Initialised with sensible defaults so the chips never render empty;
+  // replaced by real tracked-search data when the panel opens.
+  const [popular, setPopular] = useState<string[]>([
+    "wig",
+    "cream",
+    "serum",
+    "oil",
+  ]);
   const inputRef = useRef<HTMLInputElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const supabase = createClient();
+
+  // Real popular searches from tracked site searches (catalog-derived
+  // fallback while data accumulates).
+  useEffect(() => {
+    if (!isOpen) return;
+    let cancelled = false;
+    fetch("/api/search/popular")
+      .then((r) => r.json())
+      .then((d) => {
+        if (!cancelled && Array.isArray(d.terms) && d.terms.length > 0) {
+          setPopular(d.terms.slice(0, 6));
+        }
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [isOpen]);
 
   useEffect(() => {
     if (isOpen) {
@@ -58,6 +82,12 @@ export default function SearchPanel({ isOpen, onClose }: SearchPanelProps) {
       }
       setLoading(true);
       setSearched(true);
+      // Fire-and-forget: track the search for the popular-searches ranking.
+      fetch("/api/search/log", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ term: searchQuery.trim() }),
+      }).catch(() => {});
       const { data } = await supabase
         .from("products")
         .select("id, name, slug, price_cad, price_usd, images, categories(name)")
@@ -150,7 +180,7 @@ export default function SearchPanel({ isOpen, onClose }: SearchPanelProps) {
               <div className="py-4">
                 <p className="text-xs text-foreground/40 uppercase tracking-wider mb-3">Popular searches</p>
                 <div className="flex flex-wrap gap-2">
-                  {["Cleanser", "Moisturizer", "Serum", "Sunscreen"].map((term) => (
+                  {popular.map((term) => (
                     <button key={term} onClick={() => setQuery(term)} className="px-3 py-1.5 text-xs text-foreground/60 bg-muted rounded-full hover:bg-primary/10 hover:text-primary transition-colors">{term}</button>
                   ))}
                 </div>
