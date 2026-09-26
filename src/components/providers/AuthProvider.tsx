@@ -10,6 +10,7 @@ interface AuthContextType {
   profile: Profile | null;
   loading: boolean;
   signOut: () => Promise<void>;
+  refreshProfile: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -17,6 +18,7 @@ const AuthContext = createContext<AuthContextType>({
   profile: null,
   loading: true,
   signOut: async () => {},
+  refreshProfile: async () => {},
 });
 
 export function useAuth() {
@@ -29,21 +31,69 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const supabase = createClient();
 
+  const resolveProfile = async (currentUser: User): Promise<Profile> => {
+    try {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", currentUser.id)
+        .maybeSingle();
+
+      if (data) {
+        return data as Profile;
+      }
+    } catch {
+      // Fallback below
+    }
+
+    const fallbackProfile: Profile = {
+      id: currentUser.id,
+      email: currentUser.email ?? null,
+      full_name:
+        (currentUser.user_metadata?.full_name as string) ||
+        (currentUser.email ? currentUser.email.split("@")[0] : "Customer"),
+      first_name: (currentUser.user_metadata?.first_name as string) || "",
+      last_name: (currentUser.user_metadata?.last_name as string) || "",
+      avatar_url: (currentUser.user_metadata?.avatar_url as string) || null,
+      phone: (currentUser.user_metadata?.phone as string) || null,
+      country: "CA",
+      role: "customer",
+      created_at: currentUser.created_at || new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    // Auto-create or repair missing profile row in the background
+    try {
+      const { data: upserted } = await supabase
+        .from("profiles")
+        .upsert(fallbackProfile, { onConflict: "id" })
+        .select("*")
+        .maybeSingle();
+
+      if (upserted) {
+        return upserted as Profile;
+      }
+    } catch {
+      // Ignore background upsert error (e.g. strict RLS)
+    }
+
+    return fallbackProfile;
+  };
+
   useEffect(() => {
     // Get initial session
     const getInitialSession = async () => {
       const {
         data: { session },
       } = await supabase.auth.getSession();
-      setUser(session?.user ?? null);
+      const currentUser = session?.user ?? null;
+      setUser(currentUser);
 
-      if (session?.user) {
-        const { data } = await supabase
-          .from("profiles")
-          .select("*")
-          .eq("id", session.user.id)
-          .single();
-        setProfile(data);
+      if (currentUser) {
+        const prof = await resolveProfile(currentUser);
+        setProfile(prof);
+      } else {
+        setProfile(null);
       }
 
       setLoading(false);
@@ -55,7 +105,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
-      setUser(session?.user ?? null);
+      const currentUser = session?.user ?? null;
+      setUser(currentUser);
 
       // If this is a password recovery event, redirect to the reset page
       if (event === "PASSWORD_RECOVERY" && typeof window !== "undefined") {
@@ -63,13 +114,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      if (session?.user) {
-        const { data } = await supabase
-          .from("profiles")
-          .select("*")
-          .eq("id", session.user.id)
-          .single();
-        setProfile(data);
+      if (currentUser) {
+        const prof = await resolveProfile(currentUser);
+        setProfile(prof);
       } else {
         setProfile(null);
       }
@@ -82,6 +129,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [supabase]);
 
+  const refreshProfile = async () => {
+    if (!user) return;
+    const prof = await resolveProfile(user);
+    setProfile(prof);
+  };
+
   const signOut = async () => {
     await supabase.auth.signOut();
     setUser(null);
@@ -90,7 +143,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, profile, loading, signOut }}>
+    <AuthContext.Provider value={{ user, profile, loading, signOut, refreshProfile }}>
       {children}
     </AuthContext.Provider>
   );

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useAuth } from "@/components/providers/AuthProvider";
 import { User, Package, MapPin, LogOut, Loader2, Lock, Trash2, Eye, EyeOff } from "lucide-react";
@@ -15,7 +15,7 @@ const accountLinks = [
 ];
 
 export default function AccountPage() {
-  const { user, profile, loading, signOut } = useAuth();
+  const { user, profile, loading, signOut, refreshProfile } = useAuth();
   const [editing, setEditing] = useState(false);
   const [fullName, setFullName] = useState(profile?.full_name || "");
   const [phone, setPhone] = useState(profile?.phone || "");
@@ -37,6 +37,20 @@ export default function AccountPage() {
   const [deletingAccount, setDeletingAccount] = useState(false);
   const supabase = createClient();
 
+  // Sync profile fields into form state when profile or user loads
+  useEffect(() => {
+    if (profile) {
+      setFullName(profile.full_name || "");
+      setPhone(profile.phone || "");
+      setCountry(profile.country || "CA");
+    } else if (user) {
+      setFullName(
+        (user.user_metadata?.full_name as string) ||
+        (user.email ? user.email.split("@")[0] : "")
+      );
+    }
+  }, [profile, user]);
+
   if (loading) {
     return (
       <div className="min-h-[60vh] flex items-center justify-center">
@@ -45,7 +59,7 @@ export default function AccountPage() {
     );
   }
 
-  if (!user || !profile) {
+  if (!user) {
     return (
       <div className="min-h-[60vh] flex items-center justify-center">
         <div className="text-center">
@@ -72,13 +86,20 @@ export default function AccountPage() {
     setSaving(true);
     const { error } = await supabase
       .from("profiles")
-      .update({ full_name: fullName.trim(), phone: phone.trim() || null, country })
-      .eq("id", user.id);
+      .upsert({
+        id: user.id,
+        email: user.email,
+        full_name: fullName.trim(),
+        phone: phone.trim() || null,
+        country,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: "id" });
     setSaving(false);
     if (error) {
       setAccountError("We could not save your profile. Please try again.");
       return;
     }
+    await refreshProfile();
     setAccountMessage("Profile updated successfully.");
     setEditing(false);
   };
@@ -270,9 +291,9 @@ export default function AccountPage() {
                   <button
                     onClick={() => {
                       setEditing(false);
-                      setFullName(profile.full_name);
-                      setPhone(profile.phone || "");
-                      setCountry(profile.country || "CA");
+                      setFullName(profile?.full_name || (user?.user_metadata?.full_name as string) || (user?.email ? user.email.split("@")[0] : ""));
+                      setPhone(profile?.phone || "");
+                      setCountry(profile?.country || "CA");
                     }}
                     className="btn-outline"
                   >
@@ -286,7 +307,7 @@ export default function AccountPage() {
                   <div>
                     <p className="text-sm text-foreground/50">Full Name</p>
                     <p className="font-medium text-foreground">
-                      {profile.full_name}
+                      {profile?.full_name || (user?.user_metadata?.full_name as string) || (user?.email ? user.email.split("@")[0] : "Customer")}
                     </p>
                   </div>
                   <div>
@@ -298,23 +319,23 @@ export default function AccountPage() {
                   <div>
                     <p className="text-sm text-foreground/50">Phone</p>
                     <p className="font-medium text-foreground">
-                      {profile.phone || "Not provided"}
+                      {profile?.phone || "Not provided"}
                     </p>
                   </div>
                   <div>
                     <p className="text-sm text-foreground/50">Country</p>
                     <p className="font-medium text-foreground">
-                      {profile.country === "CA"
+                      {profile?.country === "CA"
                         ? "Canada"
-                        : profile.country === "US"
+                        : profile?.country === "US"
                         ? "United States"
-                        : "Not set"}
+                        : profile?.country || "Canada"}
                     </p>
                   </div>
                   <div>
                     <p className="text-sm text-foreground/50">Member Since</p>
                     <p className="font-medium text-foreground">
-                      {new Date(profile.created_at).toLocaleDateString(
+                      {new Date(profile?.created_at || user.created_at).toLocaleDateString(
                         "en-US",
                         {
                           year: "numeric",
