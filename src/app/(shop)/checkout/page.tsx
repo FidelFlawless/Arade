@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Lock, Loader2, CreditCard, ShoppingBag } from "lucide-react";
+import { Lock, Loader2, CreditCard, ShoppingBag, RefreshCw } from "lucide-react";
 import BackButton from "@/components/ui/BackButton";
 import { useCart } from "@/components/providers/CartProvider";
 import { useAuth } from "@/components/providers/AuthProvider";
@@ -14,6 +14,7 @@ import {
   isValidNorthAmericanPhone,
   isValidShippingPostalCode,
   isValidShippingRegion,
+  provincePostalMismatch,
 } from "@/lib/utils";
 import { CANADIAN_PROVINCES, US_STATES } from "@/lib/constants";
 
@@ -84,6 +85,20 @@ export default function CheckoutPage() {
   const paypalButtonsRef = useRef<HTMLDivElement>(null);
   const paypalButtonsRendered = useRef(false);
   const [paypalScriptLoaded, setPaypalScriptLoaded] = useState(false);
+  const [paypalError, setPaypalError] = useState<string | null>(null);
+  const [paypalRetry, setPaypalRetry] = useState(0);
+
+  // Canada Post live rates (fetched when the shipping address is confirmed)
+  interface ShippingRate {
+    serviceCode: string;
+    serviceName: string;
+    price: number;
+    transitDays: number | null;
+  }
+  const [shippingRates, setShippingRates] = useState<ShippingRate[]>([]);
+  const [ratesLoading, setRatesLoading] = useState(false);
+  const [ratesError, setRatesError] = useState("");
+  const [selectedRate, setSelectedRate] = useState<ShippingRate | null>(null);
 
   // Guest checkout: no login wall. Signed-in users get their profile info
   // pre-filled below; guests simply fill in the form themselves.
@@ -142,11 +157,7 @@ export default function CheckoutPage() {
     (sum, item) => sum + item[priceKey] * item.quantity,
     0
   );
-  const deliveryFee = subtotal >= storeSettings.free_delivery_threshold
-    ? 0
-    : currency === "CAD"
-      ? storeSettings.delivery_fee_cad
-      : storeSettings.delivery_fee_usd;
+  const deliveryFee = selectedRate?.price ?? 0;
   const discount = appliedCoupon?.discount || 0;
   const payableSubtotal = Math.max(0, subtotal - discount);
   const total = payableSubtotal + deliveryFee;
@@ -157,9 +168,19 @@ export default function CheckoutPage() {
     setCouponChecking(true);
     setCouponMessage(null);
     try {
+      // Send the session token so first-order coupons can verify the
+      // caller's account (history, welcome-coupon window) server-side.
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
       const res = await fetch("/api/coupons/validate", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(session?.access_token
+            ? { Authorization: `Bearer ${session.access_token}` }
+            : {}),
+        },
         body: JSON.stringify({ code, currency, subtotal }),
       });
       const data = await res.json();
@@ -232,6 +253,10 @@ export default function CheckoutPage() {
     if (!form.postal_code.trim()) newErrors.postal_code = "Postal/ZIP code is required";
     else if (!isValidShippingPostalCode(form.country, form.postal_code))
       newErrors.postal_code = form.country === "CA" ? "Enter a valid Canadian postal code" : "Enter a valid US ZIP code";
+    else if (form.province_state) {
+      const mismatch = provincePostalMismatch(form.country, form.province_state, form.postal_code);
+      if (mismatch) newErrors.postal_code = mismatch;
+    }
     if (!form.phone.trim()) newErrors.phone = "Phone number is required";
     else if (!isValidNorthAmericanPhone(form.phone)) {
       newErrors.phone = "Enter a valid Canada or United States phone number";
@@ -262,14 +287,11 @@ export default function CheckoutPage() {
       quantity: item.quantity,
     })), [cartItems]);
 
-  // ─── Step 1 -> Step 2: Validate shipping and continue to payment ──
-  const handleContinueToPayment = () => {
+  // ─── Step 1 -> Step 2: Validate shipping, fetch live Canada Post rates ──
+  const handleContinueToPayment = async () => {
     setPaymentError("");
     const errs = validateForm();
-    if (isFormValid(errs)) {
-      setCheckoutStep("payment");
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    } else {
+    if (!isFormValid(errs)) {
       // Scroll to the first field with an error
       const errorFields: (keyof ShippingForm)[] = ["phone", "email", "first_name", "last_name", "address_line1", "city", "province_state", "postal_code"];
       for (const field of errorFields) {
@@ -282,6 +304,42 @@ export default function CheckoutPage() {
           break;
         }
       }
+      return;
+    }
+
+    // Fetch live Canada Post rates for this address. No flat-rate fallback:
+    // if rates fail we stay on step 1 and show a retryable error.
+    setRatesLoading(true);
+    setRatesError("");
+    try {
+      const res = await fetch("/api/shipping/rates", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          country: form.country,
+          postalCode: form.postal_code,
+          items: buildItems(),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        setRatesError(data.error || "Could not load shipping options. Please try again.");
+        return;
+      }
+      const rates: ShippingRate[] = data.rates || [];
+      if (rates.length === 0) {
+        setRatesError("No shipping options are available for this address. Please double-check your postal code.");
+        return;
+      }
+      const prev = selectedRate ? rates.find((r) => r.serviceCode === selectedRate.serviceCode) : null;
+      setShippingRates(rates);
+      setSelectedRate(prev || rates.reduce((a, b) => (a.price <= b.price ? a : b)));
+      setCheckoutStep("payment");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } catch {
+      setRatesError("Could not load shipping options. Please check your connection and try again.");
+    } finally {
+      setRatesLoading(false);
     }
   };
 
@@ -306,6 +364,7 @@ export default function CheckoutPage() {
           country: form.country,
           currency,
           couponCode: appliedCoupon?.code || null,
+          shippingMethod: selectedRate ? { code: selectedRate.serviceCode, name: selectedRate.serviceName } : null,
         }),
       });
 
@@ -321,7 +380,7 @@ export default function CheckoutPage() {
       setPaymentError("Unable to start checkout. Please check your connection and try again.");
       setLoading(false);
     }
-  }, [user, form.country, currency, appliedCoupon, buildItems, buildShippingAddress, supabase]);
+  }, [user, form.country, currency, appliedCoupon, buildItems, buildShippingAddress, selectedRate, supabase]);
 
   // ─── PayPal checkout ─────────────────────────────────────────
   const handleCreatePayPalOrder = useCallback(async () => {
@@ -341,6 +400,7 @@ export default function CheckoutPage() {
         country: form.country,
         currency,
         couponCode: appliedCoupon?.code || null,
+        shippingMethod: selectedRate ? { code: selectedRate.serviceCode, name: selectedRate.serviceName } : null,
       }),
     });
 
@@ -355,7 +415,7 @@ export default function CheckoutPage() {
     sessionStorage.setItem("paypal_order_number", data.orderNumber);
 
     return data.paypalOrderId;
-  }, [user, form.country, currency, appliedCoupon, buildItems, buildShippingAddress, supabase]);
+  }, [user, form.country, currency, appliedCoupon, buildItems, buildShippingAddress, selectedRate, supabase]);
 
   const handlePayPalApprove = useCallback(async (data: { orderID: string }) => {
     const res = await fetch("/api/checkout/paypal/capture", {
@@ -377,30 +437,85 @@ export default function CheckoutPage() {
     }
   }, []);
 
-  // Load PayPal SDK when PayPal is selected
+  // Load PayPal SDK when PayPal is selected.
+  // Failures (missing client id, blocked script, network filter) surface as a
+  // visible error with a retry button instead of an endless spinner.
   useEffect(() => {
-    if (paymentMethod !== "paypal" || !PAYPAL_CLIENT_ID) return;
+    if (paymentMethod !== "paypal") return;
 
-    if (window.paypal) {
-      setPaypalScriptLoaded(true);
+    if (!PAYPAL_CLIENT_ID) {
+      setPaypalError(
+        "PayPal is not configured for this store (NEXT_PUBLIC_PAYPAL_CLIENT_ID is missing). " +
+          "Add it and restart the dev server, or pay by card."
+      );
       return;
     }
 
-    const script = document.createElement("script");
-    script.src = `https://www.paypal.com/sdk/js?client-id=${PAYPAL_CLIENT_ID}&currency=${currency}&intent=capture`;
-    script.async = true;
-    script.onload = () => {
+    if (window.paypal) {
       setPaypalScriptLoaded(true);
+      setPaypalError(null);
+      return;
+    }
+
+    setPaypalError(null);
+    setPaypalScriptLoaded(false);
+
+    // Reuse an in-flight/cached tag (React strict mode mounts effects twice);
+    // on an explicit retry, drop the failed tag and start a fresh request.
+    const SCRIPT_ID = "paypal-sdk-script";
+    const existing = document.getElementById(SCRIPT_ID) as HTMLScriptElement | null;
+    if (existing && paypalRetry > 0) existing.remove();
+    const reusable = existing && paypalRetry === 0 ? existing : null;
+
+    const script = reusable ?? document.createElement("script");
+    let settled = false;
+
+    const succeed = () => {
+      if (settled) return;
+      if (window.paypal) {
+        settled = true;
+        setPaypalError(null);
+        setPaypalScriptLoaded(true);
+      } else {
+        // Script responded but the SDK global never appeared.
+        settled = true;
+        setPaypalError("PayPal loaded but did not initialise. Refresh the page and try again.");
+      }
     };
-    script.onerror = () => {
-      console.error("Failed to load PayPal SDK");
+
+    const fail = () => {
+      if (settled) return;
+      settled = true;
+      console.error("Failed to load PayPal SDK:", script.src || "(reused tag)");
+      setPaypalError(
+        "Could not reach PayPal. An ad/script blocker or network filter may be blocking paypal.com — " +
+          "allow it for this site and retry, or pay by card."
+      );
     };
-    document.body.appendChild(script);
+
+    script.addEventListener("load", succeed);
+    script.addEventListener("error", fail);
+
+    if (!reusable) {
+      script.id = SCRIPT_ID;
+      script.src =
+        `https://www.paypal.com/sdk/js?client-id=${encodeURIComponent(PAYPAL_CLIENT_ID)}` +
+        `&currency=${currency}&intent=capture&components=buttons`;
+      script.async = true;
+      document.body.appendChild(script);
+    }
+
+    // Safety net: never leave the buyer staring at a spinner.
+    const timeout = window.setTimeout(() => {
+      if (window.paypal) succeed();
+      else fail();
+    }, 12_000);
 
     return () => {
-      // Don't remove the script on unmount — PayPal SDK is global
+      settled = true;
+      window.clearTimeout(timeout);
     };
-  }, [paymentMethod, currency]);
+  }, [paymentMethod, currency, paypalRetry]);
 
   // Render PayPal buttons when SDK is loaded and PayPal is selected.
   // Rebuild the button instance whenever the coupon or total changes so the
@@ -415,6 +530,11 @@ export default function CheckoutPage() {
     }
 
     if (!paypalScriptLoaded || !window.paypal || !paypalButtonsRef.current) {
+      return;
+    }
+
+    if (paypalError) {
+      // SDK reported a failure — don't attempt to render buttons.
       return;
     }
 
@@ -467,7 +587,7 @@ export default function CheckoutPage() {
         setLoading(false);
       },
     }).render(paypalButtonsRef.current);
-  }, [paymentMethod, paypalScriptLoaded, handleCreatePayPalOrder, handlePayPalApprove, appliedCoupon?.code, total]);
+  }, [paymentMethod, paypalScriptLoaded, handleCreatePayPalOrder, handlePayPalApprove, appliedCoupon?.code, total, paypalError]);
 
   const updateForm = (field: keyof ShippingForm, value: string) => {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -708,12 +828,25 @@ export default function CheckoutPage() {
               </div>
 
               {/* Continue to Payment button */}
+              {ratesError && (
+                <div role="alert" className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 mt-4">
+                  {ratesError}
+                </div>
+              )}
               <button
                 type="button"
                 onClick={handleContinueToPayment}
+                disabled={ratesLoading}
                 className="btn-primary w-full flex items-center justify-center gap-2 mt-6"
               >
-                Continue to Payment
+                {ratesLoading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Finding shipping options...
+                  </>
+                ) : (
+                  "Continue to Payment"
+                )}
               </button>
             </div>
           )}
@@ -740,6 +873,61 @@ export default function CheckoutPage() {
                   >
                     Edit
                   </button>
+                </div>
+              </div>
+
+              {/* Shipping method selection */}
+              <div className="card mb-4">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="font-medium text-foreground">Shipping Method</h3>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPaymentError("");
+                      setCheckoutStep("shipping");
+                    }}
+                    className="text-sm text-primary hover:underline font-medium"
+                  >
+                    Change
+                  </button>
+                </div>
+                {ratesError && (
+                  <div role="alert" className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 mb-3">
+                    {ratesError}
+                  </div>
+                )}
+                <div className="space-y-2">
+                  {shippingRates.map((rate) => (
+                    <label
+                      key={rate.serviceCode}
+                      className={`flex items-center justify-between rounded-lg border px-4 py-3 cursor-pointer transition-colors ${
+                        selectedRate?.serviceCode === rate.serviceCode
+                          ? "border-primary bg-primary/5"
+                          : "border-border hover:border-primary/40"
+                      }`}
+                    >
+                      <span className="flex items-center gap-3">
+                        <input
+                          type="radio"
+                          name="shipping-method"
+                          checked={selectedRate?.serviceCode === rate.serviceCode}
+                          onChange={() => setSelectedRate(rate)}
+                          className="accent-[var(--primary)]"
+                        />
+                        <span>
+                          <span className="block text-sm font-medium text-foreground">{rate.serviceName}</span>
+                          {rate.transitDays != null && (
+                            <span className="block text-xs text-foreground/50">
+                              Estimated {rate.transitDays} business day{rate.transitDays === 1 ? "" : "s"}
+                            </span>
+                          )}
+                        </span>
+                      </span>
+                      <span className="text-sm font-semibold text-foreground">
+                        {formatPrice(rate.price, currency)}
+                      </span>
+                    </label>
+                  ))}
                 </div>
               </div>
 
@@ -834,11 +1022,29 @@ export default function CheckoutPage() {
               {/* PayPal: render buttons */}
               {paymentMethod === "paypal" && (
                 <div className="mt-6">
-                  {!paypalScriptLoaded && (
-                    <div className="flex items-center justify-center gap-2 py-4 text-foreground/50 text-sm">
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      Loading PayPal...
+                  {paypalError ? (
+                    <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                      <p>{paypalError}</p>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPaypalError(null);
+                          setPaypalScriptLoaded(false);
+                          setPaypalRetry((count) => count + 1);
+                        }}
+                        className="btn-secondary mt-3 inline-flex items-center gap-2 px-3 py-1.5 text-xs"
+                      >
+                        <RefreshCw className="w-3.5 h-3.5" />
+                        Retry PayPal
+                      </button>
                     </div>
+                  ) : (
+                    !paypalScriptLoaded && (
+                      <div className="flex items-center justify-center gap-2 py-4 text-foreground/50 text-sm">
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Loading PayPal...
+                      </div>
+                    )
                   )}
                   <div className={loading ? "pointer-events-none opacity-60" : ""} ref={paypalButtonsRef} />
                 </div>
@@ -850,7 +1056,7 @@ export default function CheckoutPage() {
 
         {/* Order summary — first on mobile, right column on desktop */}
         <div className="order-first lg:order-none lg:col-span-1">
-          <div className="card sticky top-24">
+          <div className="card sticky top-24 p-4 sm:p-6">
             <h2 className="text-lg font-semibold text-foreground mb-4">
               Order Summary
             </h2>
@@ -888,20 +1094,20 @@ export default function CheckoutPage() {
                 </div>
               ) : (
                 <div>
-                  <div className="flex gap-2">
+                  <div className="flex w-full gap-2 items-center">
                     <input
                       type="text"
                       value={couponInput}
                       onChange={(e) => setCouponInput(e.target.value.toUpperCase())}
                       onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); applyCoupon(); } }}
                       placeholder="Coupon code"
-                      className="flex-1 px-3 py-2 border border-border rounded-lg text-sm bg-white outline-none focus:border-primary"
+                      className="flex-1 min-w-0 w-full px-3 py-2 border border-border rounded-lg text-sm bg-white outline-none focus:border-primary"
                     />
                     <button
                       type="button"
                       onClick={applyCoupon}
                       disabled={couponChecking || !couponInput.trim()}
-                      className="px-4 py-2 rounded-lg text-sm font-medium border border-primary text-primary hover:bg-primary/5 disabled:opacity-50"
+                      className="shrink-0 px-3.5 sm:px-4 py-2 rounded-lg text-sm font-medium border border-primary text-primary hover:bg-primary/5 disabled:opacity-50 whitespace-nowrap"
                     >
                       {couponChecking ? "Checking..." : "Apply"}
                     </button>
@@ -929,7 +1135,7 @@ export default function CheckoutPage() {
                 </div>
               )}
               <div className="flex justify-between text-sm">
-                <span className="text-foreground/60">Delivery</span>
+                <span className="text-foreground/60">Delivery ({selectedRate?.serviceName || "—"})</span>
                 <span
                   className={
                     deliveryFee === 0
@@ -942,10 +1148,9 @@ export default function CheckoutPage() {
                     : formatPrice(deliveryFee, currency)}
                 </span>
               </div>
-              {deliveryFee > 0 && (
+              {!selectedRate && (
                 <p className="text-xs text-foreground/50">
-                  Free delivery on orders over{" "}
-                  {formatPrice(storeSettings.free_delivery_threshold, currency)}
+                  Delivery is calculated from live Canada Post rates for your address.
                 </p>
               )}
             </div>

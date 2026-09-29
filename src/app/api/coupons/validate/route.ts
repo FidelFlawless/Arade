@@ -40,10 +40,11 @@ export async function POST(req: NextRequest) {
     }
 
     // Identify the caller (optional) so first-order coupons can verify
-    // account history and the signup window.
+    // account history and the welcome-coupon window.
     let userId: string | null = null;
     let userEmail: string | null = null;
     let userCreatedAt: string | null = null;
+    let userWelcomeEmailSentAt: string | null = null;
 
     const authHeader = req.headers.get("authorization");
     const token = authHeader?.replace(/^Bearer\s+/i, "");
@@ -53,6 +54,13 @@ export async function POST(req: NextRequest) {
         userId = userData.user.id;
         userEmail = userData.user.email || null;
         userCreatedAt = userData.user.created_at || null;
+        // Anchor for the welcome-coupon 30-day window (null when absent).
+        const { data: profile } = await supabaseAdmin
+          .from("profiles")
+          .select("welcome_email_sent_at")
+          .eq("id", userId)
+          .maybeSingle();
+        userWelcomeEmailSentAt = profile?.welcome_email_sent_at ?? null;
       }
     }
 
@@ -60,6 +68,7 @@ export async function POST(req: NextRequest) {
       userId,
       userEmail,
       userCreatedAt,
+      userWelcomeEmailSentAt,
       shipping: body.shipping || null,
     });
 

@@ -7,8 +7,10 @@ import {
   isValidShippingPostalCode,
   isValidShippingRegion,
 } from "@/lib/utils";
-import { DELIVERY_FEE_CAD, DELIVERY_FEE_USD } from "@/lib/constants";
 import { validateCoupon, recordCouponUsage } from "@/lib/coupons";
+import { getCanadaPostRates, CanadaPostError } from "@/lib/canadapost";
+
+const DEFAULT_ITEM_WEIGHT_GRAMS = 250;
 
 function getStripe() {
   const rawKey = process.env.STRIPE_SECRET_KEY || "";
@@ -31,12 +33,16 @@ export async function POST(req: NextRequest) {
   try {
     const stripe = getStripe();
     const body = await req.json();
-    const { userId, items, shippingAddress, country, currency, couponCode } = body;
+    const { userId, items, shippingAddress, country, currency, couponCode, shippingMethod } = body;
 
     // 1. Guest checkout: authentication is OPTIONAL. If a userId and bearer
     // token are provided, verify the token actually belongs to that user
     // (never trust the body alone). Guests proceed without either.
     const authHeader = req.headers.get("authorization");
+    // Verified caller identity + welcome-email flag, used for first-order
+    // coupon eligibility (history, address-match, expiry window).
+    let verifiedUser: { id: string; email?: string; created_at?: string } | null = null;
+    let verifiedProfile: { welcome_email_sent_at: string | null } | null = null;
     if (userId) {
       if (!authHeader) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -51,6 +57,13 @@ export async function POST(req: NextRequest) {
       if (authError || !user || user.id !== userId) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
       }
+      verifiedUser = { id: user.id, email: user.email, created_at: user.created_at };
+      const { data: profile } = await supabaseAdmin
+        .from("profiles")
+        .select("welcome_email_sent_at")
+        .eq("id", userId)
+        .maybeSingle();
+      verifiedProfile = profile ?? null;
     }
 
     // 2. Validate inputs
@@ -137,39 +150,79 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // 5. Calculate delivery fee SERVER-SIDE from store settings (with fallback)
-    const deliveryThreshold = 180;
-    let deliveryFeeCAD = DELIVERY_FEE_CAD;
-    let deliveryFeeUSD = DELIVERY_FEE_USD;
-    try {
-      const { data: settingsRows } = await supabaseAdmin
-        .from("store_settings")
-        .select("key, value")
-        .in("key", ["delivery_fee_cad", "delivery_fee_usd"]);
-      settingsRows?.forEach((row) => {
-        const num = Number(row.value);
-        if (Number.isFinite(num) && num >= 0) {
-          if (row.key === "delivery_fee_cad") deliveryFeeCAD = num;
-          if (row.key === "delivery_fee_usd") deliveryFeeUSD = num;
-        }
-      });
-    } catch {
-      // fall back to defaults
+    // 5. Delivery fee: live Canada Post rate for the customer's chosen
+    // service, re-quoted SERVER-SIDE (never trust the browser's price).
+    // No flat-rate fallback: on Canada Post failure we return a controlled
+    // error and the customer can retry.
+    if (!shippingMethod || typeof shippingMethod.code !== "string") {
+      return NextResponse.json(
+        { error: "Please choose a shipping option" },
+        { status: 400 }
+      );
     }
 
-    const deliveryFee = subtotal >= deliveryThreshold
-      ? 0
-      : currency === "CAD"
-        ? deliveryFeeCAD
-        : deliveryFeeUSD;
+    let deliveryFee = 0;
+    let shippingMethodName = shippingMethod.code;
+    try {
+      const productIds = items.map((item: { productId: string }) => item.productId);
+      const { data: weightRows } = await supabaseAdmin
+        .from("products")
+        .select("id, weight_grams")
+        .in("id", productIds);
+      const totalWeightKg =
+        items.reduce((sum: number, item: { productId: string; quantity: number }) => {
+          const row = weightRows?.find((w) => w.id === item.productId);
+          const grams = (row?.weight_grams ?? DEFAULT_ITEM_WEIGHT_GRAMS) * item.quantity;
+          return sum + grams;
+        }, 0) / 1000;
 
-    const total = subtotal + deliveryFee;
+      const rates = await getCanadaPostRates({
+        destinationCountry: country,
+        destinationPostalCode: shippingAddress.postal_code,
+        weightKg: totalWeightKg,
+      });
+      const chosen = rates.find((r) => r.serviceCode === shippingMethod.code);
+      if (!chosen) {
+        return NextResponse.json(
+          { error: "The selected shipping option is no longer available. Please pick another one." },
+          { status: 400 }
+        );
+      }
+      deliveryFee = chosen.price;
+      shippingMethodName = chosen.serviceName;
+    } catch (err) {
+      if (err instanceof CanadaPostError) {
+        console.error("Canada Post checkout rates error:", err.message);
+        return NextResponse.json(
+          { error: "Shipping is temporarily unavailable. Please try again in a moment." },
+          { status: 502 }
+        );
+      }
+      throw err;
+    }
+
+    const total = Math.round((subtotal + deliveryFee) * 100) / 100;
 
     // 6b. Coupon: validate server-side against the server-calculated subtotal.
+    // First-order coupons get the full eligibility context here (the same
+    // checks the validate endpoint runs) so they cannot be smuggled through
+    // by calling the payment route directly.
     let discount = 0;
     let appliedCouponCode: string | null = null;
     if (couponCode && typeof couponCode === "string") {
-      const couponResult = await validateCoupon(couponCode, currency, subtotal);
+      const couponResult = await validateCoupon(couponCode, currency, subtotal, {
+        userId: verifiedUser?.id ?? null,
+        userEmail: verifiedUser?.email || null,
+        userCreatedAt: verifiedUser?.created_at || null,
+        userWelcomeEmailSentAt: verifiedProfile?.welcome_email_sent_at ?? null,
+        orderEmail: shippingAddress.email || null,
+        shipping: {
+          first_name: shippingAddress.first_name,
+          last_name: shippingAddress.last_name,
+          address_line1: shippingAddress.address_line1,
+          postal_code: shippingAddress.postal_code,
+        },
+      });
       if (!couponResult.ok) {
         return NextResponse.json({ error: couponResult.error || "Invalid coupon" }, { status: 400 });
       }
@@ -236,6 +289,8 @@ export async function POST(req: NextRequest) {
         order_status: "pending",
         shipping_email: shippingAddress.email || null,
         coupon_code: appliedCouponCode,
+        shipping_method_code: shippingMethod.code,
+        shipping_method_name: shippingMethodName,
         shipping_first_name: shippingAddress.first_name,
         shipping_last_name: shippingAddress.last_name,
         shipping_phone: shippingAddress.phone || null,
@@ -292,22 +347,7 @@ export async function POST(req: NextRequest) {
       ...({ managed_payments: { enabled: false } } as Record<string, unknown>),
       customer_email: shippingAddress.email || undefined,
       line_items: lineItems,
-      shipping_address_collection: {
-        allowed_countries: ["CA", "US"],
-      },
-      shipping_options: [
-              {
-          shipping_rate_data: {
-            type: "fixed_amount",
-            fixed_amount: { amount: 0, currency: currency.toLowerCase() },
-            display_name: deliveryFee === 0 ? "Free Delivery" : "Standard Delivery",
-            delivery_estimate: {
-              minimum: { unit: "business_day", value: 3 },
-              maximum: { unit: "business_day", value: 7 },
-            },
-          },
-        },
-      ],
+
       metadata: {
         order_id: order.id,
         order_number: order.order_number,

@@ -20,6 +20,12 @@ export interface CouponEligibilityContext {
   userEmail?: string | null;
   /** When the user's account was created (ISO string), if known. */
   userCreatedAt?: string | null;
+  /** When the welcome/coupon email was sent to this user (ISO string), if known.
+   *  When present, expires_days_after_signup is anchored to this instead of
+   *  account creation, so the 30-day promise matches when the code arrived. */
+  userWelcomeEmailSentAt?: string | null;
+  /** Email used for prior guest orders, when it differs from the account email. */
+  orderEmail?: string | null;
   /** Shipping details from the current checkout, used for the address-match defense. */
   shipping?: {
     first_name?: string | null;
@@ -59,19 +65,26 @@ async function checkFirstOrderEligibility(
   }
 
   try {
-    // 1. Prior paid orders by account id or account email.
-    const email = (ctx.userEmail || "").trim().toLowerCase();
-    let historyQuery = supabaseAdmin
+    // 1. Prior paid orders by account id or order email (account email plus,
+    //    when provided, the email the current order ships to — catches guests
+    //    who checked out with a different address before signing up).
+    const emails = Array.from(
+      new Set(
+        [ctx.userEmail, ctx.orderEmail]
+          .map((e) => (e || "").trim().toLowerCase())
+          .filter(Boolean)
+      )
+    );
+    let orCondition = `user_id.eq.${ctx.userId}`;
+    for (const e of emails) {
+      orCondition += `,shipping_email.eq.${e}`;
+    }
+    const { data: priorOrders, error: historyError } = await supabaseAdmin
       .from("orders")
       .select("id")
       .eq("payment_status", "paid")
+      .or(orCondition)
       .limit(1);
-    if (email) {
-      historyQuery = historyQuery.or(`user_id.eq.${ctx.userId},shipping_email.eq.${email}`);
-    } else {
-      historyQuery = historyQuery.eq("user_id", ctx.userId);
-    }
-    const { data: priorOrders, error: historyError } = await historyQuery;
     if (!historyError && priorOrders && priorOrders.length > 0) {
       return "This coupon is only valid on your first order";
     }
@@ -124,11 +137,14 @@ async function checkFirstOrderEligibility(
       }
     }
 
-    // 3. Signup window: expires N days after account creation.
-    if (coupon.expires_days_after_signup && ctx.userCreatedAt) {
-      const created = new Date(ctx.userCreatedAt).getTime();
+    // 3. Welcome-coupon window: expires N days after the coupon email was
+    //    actually sent (welcome_email_sent_at). Falls back to account creation
+    //    when the flag is missing, so the window is never indefinite.
+    if (coupon.expires_days_after_signup) {
+      const anchorIso = ctx.userWelcomeEmailSentAt || ctx.userCreatedAt;
+      const anchor = anchorIso ? new Date(anchorIso).getTime() : NaN;
       const windowMs = coupon.expires_days_after_signup * 24 * 60 * 60 * 1000;
-      if (!Number.isNaN(created) && Date.now() > created + windowMs) {
+      if (!Number.isNaN(anchor) && Date.now() > anchor + windowMs) {
         return "This welcome coupon has expired";
       }
     }
