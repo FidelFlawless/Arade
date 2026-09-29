@@ -71,6 +71,8 @@ export interface Profile {
   role: string;
   created_at: string;
   updated_at: string;
+  /** Set once the post-verification welcome/coupon email has been sent (migration 20260105). */
+  welcome_email_sent_at?: string | null;
 }
 
 export interface ProfileInsert {
