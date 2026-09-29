@@ -50,6 +50,12 @@ export default function SignupPage() {
           data: {
             full_name: fullName,
           },
+          // Send the user back to our own auth callback after they click the
+          // confirmation link. Without this, Supabase redirects to the Site
+          // URL (production), which never fires the post-verification welcome
+          // email on local/dev builds. (http://localhost:3000/** must be in
+          // Supabase Auth > URL Configuration > Redirect URLs.)
+          emailRedirectTo: `${window.location.origin}/auth/callback?next=/account`,
         },
       });
 
@@ -67,13 +73,8 @@ export default function SignupPage() {
         }).catch(() => {});
       }
 
-      // Welcome email with the first-order discount code. Best-effort:
-      // failure must never block or break signup.
-      fetch("/api/emails/welcome", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ email, firstName: fullName.split(" ")[0] || "" }),
-      }).catch(() => {});
+      // Welcome email with the first-order discount code is now sent by the
+      // auth callback after the user verifies their email (once per user).
 
       setSuccess(true);
     } catch {

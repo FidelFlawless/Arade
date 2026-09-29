@@ -411,3 +411,105 @@ export async function sendWelcomeEmail(recipientEmail: string, firstName: string
     return false;
   }
 }
+
+/**
+ * Send the shipped-confirmation email with the Canada Post tracking PIN after
+ * a label is created (admin "Create Canada Post Shipment"). Never throws —
+ * best-effort like the other emails, so a Brevo outage never blocks shipping.
+ */
+export async function sendShippedEmail(orderId: string, trackingPin: string): Promise<boolean> {
+  try {
+    if (!BREVO_API_KEY) {
+      console.error("Shipped email skipped: BREVO_API_KEY not set");
+      return false;
+    }
+
+    const { data: order, error: orderError } = await supabaseAdmin
+      .from("orders")
+      .select(
+        `order_number, shipping_email, user_id, shipping_first_name,
+         shipping_method_name, currency`
+      )
+      .eq("id", orderId)
+      .single();
+
+    if (orderError || !order) {
+      console.error("Shipped email: order not found", orderId, orderError?.message);
+      return false;
+    }
+
+    // Recipient: guest checkout email, else the account profile email.
+    let recipient: string | null = (order as { shipping_email?: string | null }).shipping_email || null;
+    if (!recipient && (order as { user_id?: string | null }).user_id) {
+      const { data: profile } = await supabaseAdmin
+        .from("profiles")
+        .select("email")
+        .eq("id", (order as { user_id: string }).user_id)
+        .single();
+      recipient = profile?.email || null;
+    }
+    if (!recipient) {
+      console.error("Shipped email: no recipient for order", orderId);
+      return false;
+    }
+
+    const firstName = esc((order as { shipping_first_name?: string }).shipping_first_name || "there");
+    const o = order as { order_number: string; shipping_method_name?: string | null; currency: string };
+    const trackUrl = `${SITE_URL}/order/${encodeURIComponent(o.order_number)}`;
+    const cpUrl = `https://www.canadapost-postescanada.ca/track-reperage/en#/details/${encodeURIComponent(trackingPin)}`;
+
+    const htmlContent = emailShell(
+      "Your order has shipped",
+      `
+      <h2 style="font-size: 20px; color: #1a1a2e; margin: 0 0 8px;">Good news, ${firstName} — your order is on its way!</h2>
+      <p style="color: #666; font-size: 14px; margin: 0 0 24px; line-height: 1.6;">
+        Order <strong>${esc(o.order_number)}</strong> has been handed to Canada Post${
+          o.shipping_method_name ? ` via <strong>${esc(o.shipping_method_name)}</strong>` : ""
+        }.
+      </p>
+
+      <div style="background: #faf8f5; border-radius: 10px; padding: 20px; text-align: center; margin-bottom: 24px;">
+        <p style="margin: 0 0 6px; color: #999; font-size: 12px; text-transform: uppercase; letter-spacing: 1px;">Canada Post tracking number</p>
+        <p style="margin: 0; font-weight: 700; color: #1a1a2e; font-size: 22px; letter-spacing: 1px;">${esc(trackingPin)}</p>
+      </div>
+
+      <div style="text-align: center; margin-bottom: 16px;">
+        <a href="${cpUrl}" style="display: inline-block; background-color: #8B5E3C; color: white; padding: 14px 40px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 15px;">Track at Canada Post</a>
+      </div>
+      <p style="text-align: center; margin-bottom: 24px;">
+        <a href="${trackUrl}" style="color: #8B5E3C; font-size: 14px;">or follow it on your Arade order page</a>
+      </p>
+
+      <p style="color: #999; font-size: 12px; line-height: 1.6;">
+        Tracking scans usually appear within 1 business day of drop-off. If the
+        tracking number shows no movement right away, that's normal — check back
+        a little later.
+      </p>`
+    );
+
+    const response = await fetch("https://api.brevo.com/v3/smtp/email", {
+      method: "POST",
+      headers: {
+        accept: "application/json",
+        "content-type": "application/json",
+        "api-key": BREVO_API_KEY,
+      },
+      body: JSON.stringify({
+        sender: SENDER,
+        to: [{ email: recipient }],
+        subject: `Your Arade order ${o.order_number} has shipped - track it here`,
+        htmlContent,
+      }),
+    });
+
+    if (!response.ok) {
+      const errText = await response.text().catch(() => "");
+      console.error("Shipped email failed:", response.status, errText.slice(0, 300));
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.error("Shipped email error:", err);
+    return false;
+  }
+}
