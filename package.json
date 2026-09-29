@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:canadapost": "vitest run tests/canadapost.test.ts tests/canadapost.sandbox.test.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.5.2",

@@ -27,7 +27,7 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
   const [newImagePreviews, setNewImagePreviews] = useState<string[]>([]);
   const [existingImages, setExistingImages] = useState<string[]>([]);
   const [form, setForm] = useState({
-    name: "", slug: "", description: "", price_cad: "", price_usd: "", stock_quantity: "",
+    name: "", slug: "", description: "", price_cad: "", price_usd: "", stock_quantity: "", weight_grams: "",
     is_active: true, is_featured: false,
     brand: "", size: "", skin_type: "", ingredients: "", benefits: "", how_to_use: "",
   });
@@ -47,6 +47,7 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
     price_cad: number | null;
     price_usd: number | null;
     stock_quantity: number | null;
+    weight_grams: number | null;
     is_active: boolean;
     is_featured: boolean;
     images: string[] | null;
@@ -70,6 +71,7 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
           name: data.name || "", slug: data.slug || "", description: data.description || "",
           price_cad: String(data.price_cad || ""), price_usd: String(data.price_usd || ""),
           stock_quantity: String(data.stock_quantity || ""),
+          weight_grams: String(data.weight_grams || ""),
           is_active: data.is_active ?? true, is_featured: data.is_featured ?? false,
           brand: data.brand || "", size: data.size || "", skin_type: data.skin_type || "",
           ingredients: data.ingredients || "", benefits: data.benefits || "", how_to_use: data.how_to_use || "",
@@ -150,6 +152,7 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
           id, name: form.name.trim(), slug: form.slug, description: form.description.trim(),
           price_cad: Number(form.price_cad), price_usd: Number(form.price_usd),
           category_id: selectedSubCategory, stock_quantity: Number(form.stock_quantity) || 0,
+          weight_grams: Number(form.weight_grams) || 250,
           is_active: form.is_active, is_featured: form.is_featured, images: allImages,
           brand: form.brand.trim() || null, size: form.size.trim() || null,
           skin_type: form.skin_type.trim() || null, ingredients: form.ingredients.trim() || null,
@@ -252,6 +255,12 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
               <label className="block text-sm font-medium text-foreground mb-2">Stock Quantity</label>
               <input type="number" value={form.stock_quantity} onChange={(e) => setForm({ ...form, stock_quantity: e.target.value })}
                 className="w-full px-4 py-2.5 border border-border rounded-lg text-sm outline-none" min="0" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-2">Package Weight (grams)</label>
+              <input type="number" value={form.weight_grams} onChange={(e) => setForm({ ...form, weight_grams: e.target.value })}
+                className="w-full px-4 py-2.5 border border-border rounded-lg text-sm outline-none" min="1" placeholder="250" />
+              <p className="text-xs text-foreground/50 mt-1">Used to calculate live Canada Post shipping rates. Default 250 g.</p>
             </div>
           </div>
           {/* Exchange Rate Info */}

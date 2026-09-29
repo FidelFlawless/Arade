@@ -62,26 +62,26 @@ export default function ProductReviewsSection({
     <div className="mt-16 border-t border-border pt-12">
       <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-8">Customer Reviews</h2>
 
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
+      <div className="flex items-center justify-between gap-3 mb-6 sm:mb-8">
         <div className="flex items-center gap-4 text-base text-foreground/70">
           <button type="button" className="font-medium text-foreground border-b-2 border-foreground pb-1">
             Product reviews ({reviewCount})
           </button>
         </div>
 
-        <div className="relative w-fit">
+        <div className="relative w-fit shrink-0">
           <select
             aria-label="Sort reviews"
             value={sort}
             onChange={(event) => setSort(event.target.value as "recent" | "oldest" | "highest" | "lowest")}
-            className="appearance-none rounded-xl border border-border bg-white px-4 py-2.5 pr-10 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+            className="appearance-none rounded-xl border border-border bg-white px-3 sm:px-4 py-2 sm:py-2.5 pr-8 sm:pr-10 text-xs sm:text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
           >
             <option value="recent">Most Recent</option>
             <option value="oldest">Oldest</option>
             <option value="highest">Highest Rated</option>
             <option value="lowest">Lowest Rated</option>
           </select>
-          <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-foreground/60" aria-hidden="true" />
+          <ChevronDown className="pointer-events-none absolute right-2.5 sm:right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-foreground/60" aria-hidden="true" />
         </div>
       </div>
 

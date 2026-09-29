@@ -24,7 +24,7 @@ export default function NewProductPage() {
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const [form, setForm] = useState({
-    name: "", slug: "", description: "", sku: "", price_cad: "", price_usd: "", stock_quantity: "",
+    name: "", slug: "", description: "", sku: "", price_cad: "", price_usd: "", stock_quantity: "", weight_grams: "",
     is_active: true, is_featured: false,
     brand: "", size: "", skin_type: "", ingredients: "", benefits: "", how_to_use: "",
   });
@@ -97,6 +97,7 @@ export default function NewProductPage() {
         price_usd: Number(form.price_usd),
         category_id: selectedSubCategory,
         stock_quantity: Number(form.stock_quantity) || 0,
+        weight_grams: Number(form.weight_grams) || 250,
         is_active: form.is_active,
         is_featured: form.is_featured,
         images: imageUrls,
@@ -204,6 +205,12 @@ export default function NewProductPage() {
               <label className="block text-sm font-medium text-foreground mb-2">Stock Quantity</label>
               <input type="number" value={form.stock_quantity} onChange={(e) => setForm({ ...form, stock_quantity: e.target.value })}
                 className="w-full px-4 py-2.5 border border-border rounded-lg text-sm outline-none" min="0" placeholder="0" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-2">Package Weight (grams)</label>
+              <input type="number" value={form.weight_grams} onChange={(e) => setForm({ ...form, weight_grams: e.target.value })}
+                className="w-full px-4 py-2.5 border border-border rounded-lg text-sm outline-none" min="1" placeholder="250" />
+              <p className="text-xs text-foreground/50 mt-1">Used to calculate live Canada Post shipping rates. Default 250 g.</p>
             </div>
           </div>
           {/* Exchange Rate Info */}

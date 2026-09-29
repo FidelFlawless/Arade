@@ -98,6 +98,51 @@ export function isValidShippingPostalCode(country: "CA" | "US", code: string): b
   return country === "CA" ? isValidCanadianPostalCode(code.trim()) : isValidUSZipCode(code.trim());
 }
 
+// First letter of a Canadian postal code maps to a province/territory (FSA
+// mapping). Used to catch mismatched province + postal code combinations
+// (e.g. "Newcastle, NT M5V 2T6") before they reach Canada Post.
+const POSTAL_FSA_PROVINCES: Record<string, string[]> = {
+  A: ["NL"],
+  B: ["NS", "PE"],
+  C: ["PE"],
+  E: ["NB"],
+  G: ["QC"],
+  H: ["QC"],
+  J: ["QC"],
+  K: ["ON"],
+  L: ["ON"],
+  M: ["ON"],
+  N: ["ON"],
+  P: ["ON"],
+  R: ["MB"],
+  S: ["SK"],
+  T: ["AB"],
+  V: ["BC"],
+  X: ["NT", "NU"],
+  Y: ["YT"],
+};
+
+/**
+ * Returns an error message if a Canadian province and postal code don't
+ * match (the postal code's first letter must be valid for the province).
+ * Returns null when consistent or when not applicable (US addresses).
+ */
+export function provincePostalMismatch(
+  country: "CA" | "US",
+  province: string,
+  postalCode: string
+): string | null {
+  if (country !== "CA") return null;
+  const code = postalCode.trim().toUpperCase().replace(/\s+/g, "");
+  if (!/^[A-Z]\d[A-Z]\d[A-Z]\d$/.test(code)) return null; // format validated separately
+  const allowed = POSTAL_FSA_PROVINCES[code[0]];
+  if (!allowed || !province) return null;
+  if (!allowed.includes(province)) {
+    return "The postal code does not match the selected province. Please check both fields.";
+  }
+  return null;
+}
+
 export function isValidShippingRegion(country: "CA" | "US", region: string): boolean {
   const regions = country === "CA" ? CANADIAN_PROVINCES : US_STATES;
   return regions.some(({ code }) => code === region);
