@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { Truck, Search, Loader2, CheckCircle, Clock, XCircle } from "lucide-react";
 import BackButton from "@/components/ui/BackButton";
 import { formatPrice } from "@/lib/utils";
+import LiveTracking from "@/components/orders/LiveTracking";
 import { Suspense } from "react";
 
 export default function TrackOrderPage() {
@@ -20,6 +21,7 @@ interface TrackedOrder {
   order_number: string;
   order_status: string;
   payment_status: string;
+  tracking_number?: string | null;
   currency: "CAD" | "USD";
   subtotal: number;
   delivery_fee: number;
@@ -131,6 +133,14 @@ function TrackOrderContent() {
           {loading ? "Checking..." : "Track Order"}
         </button>
       </form>
+
+      {order && (
+        <LiveTracking
+          orderNumber={order.order_number}
+          email={email}
+          trackingNumber={order.tracking_number}
+        />
+      )}
 
       {order && (
         <div className="card">

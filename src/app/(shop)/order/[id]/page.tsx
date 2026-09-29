@@ -6,6 +6,7 @@ import { useParams } from "next/navigation";
 import { useAuth } from "@/components/providers/AuthProvider";
 import { createClient } from "@/lib/supabase/client";
 import ReviewForm from "@/components/reviews/ReviewForm";
+import LiveTracking from "@/components/orders/LiveTracking";
 import { CheckCircle, Package, Truck, ArrowRight, Loader2 } from "lucide-react";
 
 interface OrderItem {
@@ -41,6 +42,8 @@ interface Order {
   shipping_state_province?: string;
   shipping_postal_code: string;
   shipping_country: string;
+  tracking_number: string | null;
+  shipping_method_name: string | null;
   order_items: OrderItem[];
 }
 
@@ -141,12 +144,26 @@ export default function OrderDetailPage() {
         </div>
       </div>
 
+      <LiveTracking
+        orderNumber={order.order_number}
+        trackingNumber={order.tracking_number}
+      />
+
       <div className="card mb-6">
         <div className="flex items-center gap-3 mb-4"><Truck className="w-5 h-5 text-primary" /><h2 className="font-semibold">Shipping Address</h2></div>
         <p className="text-foreground/70">{order.shipping_first_name} {order.shipping_last_name}</p>
         <p className="text-foreground/70">{order.shipping_address_line1}{order.shipping_address_line2 && <>, {order.shipping_address_line2}</>}</p>
         <p className="text-foreground/70">{order.shipping_city}, {order.shipping_state_province || order.shipping_province_state} {order.shipping_postal_code}</p>
         <p className="text-foreground/70">{order.shipping_country === "CA" ? "Canada" : "United States"}</p>
+        {order.shipping_method_name && (
+          <p className="text-foreground/70 mt-2">Shipping method: {order.shipping_method_name}</p>
+        )}
+        {order.tracking_number && (
+          <div className="mt-4 pt-4 border-t border-border">
+            <p className="text-sm text-foreground/60 mb-2">Tracking number</p>
+            <p className="font-mono font-medium">{order.tracking_number}</p>
+          </div>
+        )}
       </div>
 
       <div className="card mb-6">

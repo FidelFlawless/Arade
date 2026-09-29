@@ -29,7 +29,7 @@ export async function GET(req: NextRequest) {
     const { data: order, error } = await supabaseAdmin
       .from("orders")
       .select(
-        `id, order_number, order_status, payment_status, currency,
+        `id, order_number, order_status, payment_status, tracking_number, currency,
          subtotal, delivery_fee, discount, total, created_at,
          shipping_email, user_id,
          order_items (product_name, quantity, unit_price, subtotal)`
@@ -54,6 +54,7 @@ export async function GET(req: NextRequest) {
         order_number: order.order_number,
         order_status: order.order_status,
         payment_status: order.payment_status,
+        tracking_number: order.tracking_number || null,
         currency: order.currency,
         subtotal: Number(order.subtotal),
         delivery_fee: Number(order.delivery_fee),

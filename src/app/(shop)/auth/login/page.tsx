@@ -13,6 +13,11 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
+  const [showResend, setShowResend] = useState(false);
+  const [resendEmail, setResendEmail] = useState("");
+  const [resendLoading, setResendLoading] = useState(false);
+  const [resendDone, setResendDone] = useState(false);
+  const [resendError, setResendError] = useState("");
   const [loading, setLoading] = useState(false);
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
@@ -64,6 +69,29 @@ export default function LoginPage() {
     } catch {
       setError("An unexpected error occurred. Please try again.");
       setLoading(false);
+    }
+  };
+
+  const handleResend = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setResendError("");
+    setResendLoading(true);
+    try {
+      const res = await fetch("/api/auth/resend-confirmation", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: resendEmail.trim() }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setResendError(data.error || "Could not send the email. Please try again.");
+        return;
+      }
+      setResendDone(true);
+    } catch {
+      setResendError("Could not send the email. Please try again.");
+    } finally {
+      setResendLoading(false);
     }
   };
 
@@ -191,6 +219,61 @@ export default function LoginPage() {
               Create one
             </Link>
           </p>
+
+          <div className="mt-6 border-t border-border pt-5 text-center">
+            {!showResend ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setShowResend(true);
+                  setResendEmail(email);
+                }}
+                className="text-sm text-foreground/60 hover:text-foreground underline underline-offset-2"
+              >
+                Didn&apos;t get your confirmation email? Resend it
+              </button>
+            ) : resendDone ? (
+              <p className="text-sm text-green-700" role="status">
+                If an account exists for that email, a new confirmation link is
+                on its way. Check your inbox (and spam folder).
+              </p>
+            ) : (
+              <form onSubmit={handleResend} className="space-y-3 text-left">
+                <p className="text-sm text-foreground/60">
+                  We&apos;ll send a fresh confirmation link to your email.
+                </p>
+                {resendError && (
+                  <p className="text-xs text-red-600" role="alert">{resendError}</p>
+                )}
+                <div className="flex items-center w-full border border-border rounded-lg px-3 py-2.5 bg-white">
+                  <Mail className="w-5 h-5 text-foreground/40 shrink-0 mr-2" />
+                  <input
+                    type="email"
+                    required
+                    suppressHydrationWarning
+                    value={resendEmail}
+                    onChange={(e) => setResendEmail(e.target.value)}
+                    placeholder="you@example.com"
+                    className="flex-1 min-w-0 outline-none bg-transparent text-foreground text-base"
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={resendLoading}
+                  className="btn-outline w-full flex items-center justify-center gap-2"
+                >
+                  {resendLoading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Sending...
+                    </>
+                  ) : (
+                    "Resend confirmation email"
+                  )}
+                </button>
+              </form>
+            )}
+          </div>
         </div>
       </div>
     </div>

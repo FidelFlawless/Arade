@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useAuth } from "@/components/providers/AuthProvider";
-import { User, Package, MapPin, LogOut, Loader2, Lock, Trash2, Eye, EyeOff } from "lucide-react";
+import { User, Package, MapPin, LogOut, Loader2, Lock, Trash2, Eye, EyeOff, Mail } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { isValidNorthAmericanPhone } from "@/lib/utils";
 import BackButton from "@/components/ui/BackButton";
@@ -35,6 +35,10 @@ export default function AccountPage() {
   const [passwordError, setPasswordError] = useState("");
   const [passwordMessage, setPasswordMessage] = useState("");
   const [deletingAccount, setDeletingAccount] = useState(false);
+  const [welcomeSending, setWelcomeSending] = useState(false);
+  const [welcomeMessage, setWelcomeMessage] = useState("");
+  const [welcomeError, setWelcomeError] = useState("");
+  const welcomeRequested = useRef(false);
   const supabase = createClient();
 
   // Sync profile fields into form state when profile or user loads
@@ -142,6 +146,52 @@ export default function AccountPage() {
     setCurrentPassword("");
     setChangingPassword(false);
     setPasswordMessage("Password changed successfully.");
+  };
+
+  // Auto-request the welcome/coupon email once if this verified account has
+  // never received it (e.g. they confirmed before the post-verification
+  // welcome flow existed). Runs silently at most once per page load.
+  useEffect(() => {
+    if (
+      !loading &&
+      user &&
+      user.email_confirmed_at &&
+      profile &&
+      !profile.welcome_email_sent_at &&
+      !welcomeRequested.current
+    ) {
+      welcomeRequested.current = true;
+      requestWelcomeEmail(true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, user, profile]);
+
+  const requestWelcomeEmail = async (silent = false) => {
+    setWelcomeSending(true);
+    setWelcomeMessage("");
+    setWelcomeError("");
+    try {
+      const response = await fetch("/api/account/welcome", { method: "POST" });
+      if (response.ok) {
+        setWelcomeMessage(
+          "Welcome email with your first-order discount code sent! Check your inbox (and spam folder)."
+        );
+        await refreshProfile();
+      } else if (!silent) {
+        const body = await response.json().catch(() => ({}));
+        setWelcomeError(
+          response.status === 409
+            ? "The welcome email was already sent to your inbox."
+            : body.error || "We could not send the welcome email. Please try again."
+        );
+      }
+    } catch {
+      if (!silent) {
+        setWelcomeError("We could not send the welcome email. Please try again.");
+      }
+    } finally {
+      setWelcomeSending(false);
+    }
   };
 
   const handleDeleteAccount = async () => {
@@ -358,6 +408,24 @@ export default function AccountPage() {
             <p className="text-sm text-foreground/60 mb-4">
               Email verification: {user.email_confirmed_at ? "Verified" : "Not verified"}
             </p>
+            {welcomeMessage && <div className="mb-4 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-700" role="status">{welcomeMessage}</div>}
+            {welcomeError && <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">{welcomeError}</div>}
+            {!welcomeMessage && !welcomeSending && (
+              <button
+                type="button"
+                onClick={() => requestWelcomeEmail(false)}
+                className="btn-outline mb-4 text-sm"
+              >
+                <Mail className="w-4 h-4" />
+                Resend welcome discount code
+              </button>
+            )}
+            {welcomeSending && (
+              <p className="mb-4 text-sm text-foreground/60 flex items-center gap-2">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Sending welcome email...
+              </p>
+            )}
             {passwordError && <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">{passwordError}</div>}
             {passwordMessage && <div className="mb-4 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-700" role="status">{passwordMessage}</div>}
             {!changingPassword ? (

@@ -28,6 +28,10 @@ interface OrderDetail {
   country: string;
   created_at: string;
   shipping_email: string | null;
+  shipping_method_name: string | null;
+  shipping_method_code: string | null;
+  tracking_number: string | null;
+  label_url: string | null;
   profiles: { full_name: string; email: string } | null;
   order_items: {
     id: string;
@@ -56,6 +60,8 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
   const [order, setOrder] = useState<OrderDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
+  const [creatingShipment, setCreatingShipment] = useState(false);
+  const [shipmentMessage, setShipmentMessage] = useState<{ type: "error" | "success"; text: string } | null>(null);
   const supabase = createClient();
 
   useEffect(() => {
@@ -98,6 +104,42 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
     });
     setOrder((prev) => (prev ? { ...prev, order_status: newStatus } : prev));
     setUpdating(false);
+  }
+
+  async function createShipment() {
+    setCreatingShipment(true);
+    setShipmentMessage(null);
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token;
+      const res = await fetch(`/api/admin/orders/${id}/shipment`, {
+        method: "POST",
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setShipmentMessage({ type: "success", text: `Shipment created — tracking ${data.trackingNumber}` });
+        setOrder((prev) =>
+          prev
+            ? {
+                ...prev,
+                tracking_number: data.trackingNumber,
+                label_url: data.labelUrl,
+                order_status: "shipped",
+              }
+            : prev
+        );
+        if (data.labelUrl) {
+          window.open(`/api/admin/orders/${id}/label`, "_blank");
+        }
+      } else {
+        setShipmentMessage({ type: "error", text: data.error || "Failed to create shipment" });
+      }
+    } catch {
+      setShipmentMessage({ type: "error", text: "Could not reach the shipment service. Try again." });
+    } finally {
+      setCreatingShipment(false);
+    }
   }
 
   if (loading) {
@@ -271,6 +313,72 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
             </div>
           </div>
 
+          {/* Canada Post Shipment */}
+          <div className="card">
+            <h2 className="text-lg font-semibold text-foreground mb-4">Canada Post Shipment</h2>
+            {order.shipping_method_name && (
+              <p className="text-sm mb-2">
+                <span className="text-foreground/60">Service:</span> {order.shipping_method_name}
+                {order.shipping_method_code && <span className="text-foreground/40"> ({order.shipping_method_code})</span>}
+              </p>
+            )}
+            {order.tracking_number ? (
+              <div className="space-y-2 text-sm">
+                <p>
+                  <span className="text-foreground/60">Tracking PIN:</span>{" "}
+                  <span className="font-mono font-medium">{order.tracking_number}</span>
+                </p>
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    onClick={() => window.open(`/api/admin/orders/${id}/label`, "_blank")}
+                    className="btn-secondary inline-flex items-center gap-2 px-4 py-2 text-sm"
+                  >
+                    <Printer className="w-4 h-4" />
+                    View Label (PDF)
+                  </button>
+                  <a
+                    href={`https://www.canadapost-postescanada.ca/track-reperage/en#/details/${order.tracking_number}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 px-4 py-2 text-sm rounded-lg border border-border hover:border-primary transition-colors"
+                  >
+                    Track at Canada Post
+                  </a>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <button
+                  type="button"
+                  onClick={createShipment}
+                  disabled={creatingShipment || order.payment_status !== "paid"}
+                  className="btn-primary inline-flex items-center gap-2 px-4 py-2 text-sm disabled:opacity-50"
+                >
+                  {creatingShipment ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Creating shipment...
+                    </>
+                  ) : (
+                    <>
+                      <Package className="w-4 h-4" />
+                      Create Canada Post Shipment
+                    </>
+                  )}
+                </button>
+                {order.payment_status !== "paid" && (
+                  <p className="text-xs text-foreground/50">Only paid orders can be shipped.</p>
+                )}
+              </div>
+            )}
+            {shipmentMessage && (
+              <p className={`mt-2 text-xs ${shipmentMessage.type === "success" ? "text-green-600" : "text-red-600"}`}>
+                {shipmentMessage.text}
+              </p>
+            )}
+          </div>
+
           {/* Payment */}
           <div className="card">
             <h2 className="text-lg font-semibold text-foreground mb-4">Payment</h2>
@@ -293,9 +401,18 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
       {order.payment_status === "paid" && (
         <section className="invoice-print" aria-label="Printable invoice">
           <div className="flex items-start justify-between border-b-2 border-black pb-6">
-            <div>
-              <h1 className="text-3xl font-bold">Arade</h1>
-              <p className="mt-1 text-sm">Beauty, skincare, hair and fashion</p>
+            <div className="flex items-center gap-4">
+              <img
+                src="/logo.webp"
+                alt="Arade"
+                width={64}
+                height={64}
+                className="h-14 w-14 object-contain rounded-xl"
+              />
+              <div>
+                <h1 className="text-3xl font-bold">Arade</h1>
+                <p className="mt-0.5 text-sm text-gray-600">Beauty, skincare, hair and fashion</p>
+              </div>
             </div>
             <div className="text-right">
               <h2 className="text-2xl font-bold">INVOICE</h2>
