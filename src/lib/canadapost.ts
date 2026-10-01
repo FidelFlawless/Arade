@@ -202,6 +202,9 @@ const ERROR_HINTS: Record<string, string> = {
       "then retry.",
   "7289":
     "The selected service code is not valid for this customer number / contract.",
+  "7302":
+    "Small/Medium Business accounts cannot use manifest (group) shipping - every label must be purchased individually. " +
+      "Keep transmitShipment: true; do not switch this account to group/manifest mode.",
   "9112":
     "The selected service is not available for this origin / destination pair.",
   "9162":
