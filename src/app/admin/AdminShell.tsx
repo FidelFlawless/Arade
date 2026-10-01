@@ -32,10 +32,15 @@ const adminNavItems = [
   { href: "/admin/settings", label: "Settings", icon: Settings },
 ];
 
-function AdminSidebar() {
+function AdminSidebar({
+  collapsed,
+  onToggleCollapsed,
+}: {
+  collapsed: boolean;
+  onToggleCollapsed: (next: boolean) => void;
+}) {
   const pathname = usePathname();
   const { profile, signOut } = useAuth();
-  const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
@@ -52,7 +57,10 @@ function AdminSidebar() {
         <div className="flex flex-col h-full">
           <div className="flex items-center justify-between p-4 border-b border-white/10">
             {!collapsed && <Link href="/admin" className="text-lg font-bold text-primary-light">Arade Admin</Link>}
-            <button onClick={() => setCollapsed(!collapsed)} className="hidden lg:block p-1 hover:bg-white/10 rounded">
+            <button
+              onClick={() => onToggleCollapsed(!collapsed)}
+              className="hidden lg:block p-1 hover:bg-white/10 rounded"
+            >
               <ChevronLeft className={`w-5 h-5 transition-transform ${collapsed ? "rotate-180" : ""}`} />
             </button>
           </div>
@@ -80,5 +88,23 @@ function AdminSidebar() {
 }
 
 export default function AdminShell({ children }: { children: React.ReactNode }) {
-  return <AuthProvider><div className="min-h-screen bg-muted/30"><AdminSidebar /><main className="lg:ml-64 pt-[58px] px-4 pb-4 lg:pt-8 lg:pl-8 lg:pr-8 lg:pb-8 transition-all duration-300">{children}</main></div></AuthProvider>;
+  // Lifted so the content margin tracks the sidebar width when it collapses.
+  const [collapsed, setCollapsed] = useState(false);
+
+  return (
+    <AuthProvider>
+      <div className="min-h-screen bg-muted/30">
+        <AdminSidebar collapsed={collapsed} onToggleCollapsed={setCollapsed} />
+        <main
+          className={`pt-[58px] px-4 pb-4 lg:pt-8 lg:px-8 lg:pb-8 transition-all duration-300 ${
+            collapsed ? "lg:ml-16" : "lg:ml-64"
+          }`}
+        >
+          {/* Cap the width on very wide monitors so cards don't stretch into
+              an unreadable single band; still fully fluid below that. */}
+          <div className="mx-auto w-full max-w-6xl">{children}</div>
+        </main>
+      </div>
+    </AuthProvider>
+  );
 }

@@ -165,19 +165,19 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
 
   return (
     <div>
-      <div className="flex items-center gap-4 mb-8">
+      <div className="flex flex-wrap items-center gap-3 sm:gap-4 mb-6 sm:mb-8">
         <Link href="/admin/orders" className="p-2 hover:bg-muted rounded-lg transition-colors">
           <ArrowLeft className="w-5 h-5" />
         </Link>
-        <div className="flex-1">
-          <h1 className="text-2xl font-bold text-foreground">
+        <div className="flex-1 min-w-[10rem]">
+          <h1 className="text-xl sm:text-2xl font-bold text-foreground">
             Order {order.order_number || order.id.slice(0, 8)}
           </h1>
           <p className="text-foreground/60">
             Placed on {new Date(order.created_at).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3 w-full sm:w-auto">
           {order.payment_status === "paid" && (
             <button
               type="button"
@@ -221,7 +221,7 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
                 const productImage = item.products?.images?.[0];
                 const currencyPrefix = order.currency === "CAD" ? "C$" : "US$";
                 return (
-                  <div key={item.id} className="flex items-center justify-between py-3 border-b border-border last:border-0">
+                  <div key={item.id} className="flex items-center justify-between gap-3 py-3 border-b border-border last:border-0">
                     <div className="flex items-center gap-3">
                       {productImage ? (
                         <div className="relative w-12 h-12 rounded-lg overflow-hidden bg-muted shrink-0 border border-border">
@@ -328,7 +328,7 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
                   <span className="text-foreground/60">Tracking PIN:</span>{" "}
                   <span className="font-mono font-medium">{order.tracking_number}</span>
                 </p>
-                <div className="flex gap-3">
+                <div className="flex flex-wrap gap-3">
                   <button
                     type="button"
                     onClick={() => window.open(`/api/admin/orders/${id}/label`, "_blank")}
@@ -421,7 +421,7 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
             </div>
           </div>
 
-          <div className="mt-8 grid grid-cols-2 gap-8 text-sm">
+          <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 gap-6 sm:gap-8 text-sm">
             <div>
               <h3 className="mb-2 font-bold uppercase tracking-wide">Bill to</h3>
               <p>{order.profiles?.full_name || `${shipping.first_name || "Guest"} ${shipping.last_name || ""}`}</p>
