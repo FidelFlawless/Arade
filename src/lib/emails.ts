@@ -251,10 +251,10 @@ export async function sendOrderConfirmationEmail(orderId: string): Promise<boole
       },
       body: JSON.stringify({
         sender: SENDER,
+        // Customer email goes ONLY to the customer. The admin is notified by
+        // the separate "New Arade order" email below (no BCC copy of the
+        // customer's confirmation).
         to: [{ email: recipient }],
-        ...(ORDER_NOTIFICATION_EMAIL && ORDER_NOTIFICATION_EMAIL.toLowerCase() !== recipient.toLowerCase()
-          ? { bcc: [{ email: ORDER_NOTIFICATION_EMAIL }] }
-          : {}),
         subject: `Your Arade order ${o.order_number} - view your order details`,
         htmlContent,
       }),
