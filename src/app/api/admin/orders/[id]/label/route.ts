@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { requireAdminUser } from "@/lib/auth/admin";
 import { getShipmentLabelPdf } from "@/lib/canadapost";
 
 const supabaseAdmin = createClient(
@@ -17,28 +18,10 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    // Admin auth check
-    const authHeader = _req.headers.get("authorization");
-    if (!authHeader) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-    const token = authHeader.replace(/^Bearer\s+/i, "");
-    const supabaseAuth = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    );
-    const { data: { user } } = await supabaseAuth.auth.getUser(token);
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-    const { data: profile } = await supabaseAdmin
-      .from("profiles")
-      .select("role")
-      .eq("id", user.id)
-      .single();
-    if (profile?.role !== "admin") {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
+    // Admin auth via the shared cookie-session helper (same as every other
+    // admin route), so the PDF can be opened directly in a new tab.
+    const auth = await requireAdminUser();
+    if (!auth.allowed) return auth.response;
 
     const { id } = await params;
     const { data: order } = await supabaseAdmin
