@@ -261,18 +261,14 @@ export default async function ProductPage({
             {
               "@type": "BreadcrumbList",
               // Mirrors the visible breadcrumb exactly: Home / Shop / parent
-              // category / [subcategory] / product. Subcategories have no page
-              // of their own, so that level carries a name but no URL.
+              // category / product.
               itemListElement: [
                 { "@type": "ListItem", position: 1, name: "Home", item: absoluteUrl("/") },
                 { "@type": "ListItem", position: 2, name: "Shop", item: absoluteUrl("/shop") },
                 { "@type": "ListItem", position: 3, name: parentName, item: absoluteUrl(`/${parentSlug}`) },
-                ...(isSubcategory
-                  ? [{ "@type": "ListItem", position: 4, name: categoryName }]
-                  : []),
                 {
                   "@type": "ListItem",
-                  position: isSubcategory ? 5 : 4,
+                  position: 4,
                   name: product.name,
                   item: absoluteUrl(`/product/${product.slug}`),
                 },

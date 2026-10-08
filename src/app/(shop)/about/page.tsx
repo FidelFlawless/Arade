@@ -1,114 +1,112 @@
 import { Metadata } from "next";
-import { SITE_NAME } from "@/lib/constants";
-import { Gem, Leaf, Globe } from "lucide-react";
-import { buildPageMetadata } from "@/lib/seo";
 import BackButton from "@/components/ui/BackButton";
+import { buildPageMetadata } from "@/lib/seo";
 
 export const metadata: Metadata = buildPageMetadata({
-  title: "About Arade",
-  description: "Learn about Arade, your destination for beauty, skincare, hair and fashion.",
+  title: "About Arade Shop",
+  description:
+    "Good skincare starts with understanding your skin. Learn about Arade Shop, an online shop for branded skincare and body-care products.",
   path: "/about",
-  ogTitle: "About Arade",
+  ogTitle: "About Arade Shop",
 });
+
+const SECTIONS = [
+  {
+    heading: "Thoughtfully Chosen, With You in Mind",
+    paragraphs: [
+      "There is a lot of choice in skincare, and knowing where to begin can feel overwhelming. That is why we carefully curate our collection, choosing products from different brands for a range of skin concerns and everyday care needs.",
+      "From cleansers and moisturisers to serums, sunscreens and body washes, our collection helps you explore options for hydration, uneven skin tone, blemish-prone skin and maintaining your skin’s natural glow. We believe a good routine should be something you can understand, enjoy and keep up with.",
+    ],
+  },
+  {
+    heading: "Care in How We Source",
+    paragraphs: [
+      "Trust matters, especially when it comes to products you use on your skin. We source our collection through carefully selected suppliers and manufacturers around the world, with attention to authenticity, product quality and condition.",
+      "As a retailer of established brands, our role is to bring those products together in one convenient place. We take that responsibility seriously because you deserve to feel confident about what you are buying and who you are buying it from.",
+    ],
+  },
+  {
+    heading: "A Personal Approach to Skincare",
+    paragraphs: [
+      "No two people have exactly the same skin. A product that works beautifully for one person may not be the right fit for another, and your skin’s needs can change over time.",
+      "At Arade Shop, we respect those differences. We aim to share clear product information, help you understand your options and encourage thoughtful choices. We believe in realistic expectations, consistent care and giving your skin the attention it deserves.",
+      "For us, skincare is also about the everyday moments: washing your face after a long day, applying your favourite moisturiser or taking a few quiet minutes for yourself. Those small habits matter.",
+    ],
+  },
+  {
+    heading: "Customers at the Heart of Our Shop",
+    paragraphs: [
+      "Behind every order is a person placing their trust in us. We want that trust to be reflected in how we communicate, prepare your order and respond when you need support.",
+      "As an online business, we work to make your experience straightforward and reassuring—from browsing our collection to receiving your purchase. Your questions, feedback and concerns matter to us. We want you to feel comfortable reaching out and confident that you will be treated with care and respect.",
+    ],
+  },
+  {
+    heading: "Growing a Community Around Care",
+    paragraphs: [
+      "Our vision goes beyond selling products. We want Arade Shop to become a welcoming space where people can discover skincare, share their experiences and feel supported in caring for themselves.",
+      "We celebrate progress at every stage. There is no single version of beautiful skin, and caring for yourself should never feel like a competition. Whether your routine has three steps or a few more, we are happy to be part of your journey.",
+    ],
+  },
+];
 
 export default function AboutPage() {
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12 lg:py-20">
       <BackButton href="/" label="Back to home" />
       {/* Hero */}
-      <div className="text-center mb-16">
+      <div className="text-center mb-12">
         <h1 className="text-4xl lg:text-5xl font-serif text-foreground mb-6">
-          About {SITE_NAME}
+          About Arade Shop
         </h1>
-        <p className="text-lg text-foreground/60 max-w-2xl mx-auto">
-          We believe everyone deserves access to carefully curated beauty, skincare,
-          hair and fashion products. Arade was founded with a simple mission: to
-          help you express your unique style with confidence.
+        <div className="text-lg text-foreground/60 max-w-2xl mx-auto space-y-4 text-left">
+          <p>
+            Good skincare starts with understanding your skin and choosing
+            products with care. At Arade Shop, we bring together branded
+            skincare and body-care products to help you build a routine that
+            fits your needs, your lifestyle and your budget.
+          </p>
+          <p>
+            We are an online beauty shop with a simple purpose: to make
+            shopping for skincare feel easier and more personal. Whether you
+            are starting your first routine, looking for a favourite product or
+            giving your current routine a little more attention, we want you to
+            feel welcome here.
+          </p>
+        </div>
+      </div>
+
+      {/* Image */}
+      <div className="rounded-2xl overflow-hidden bg-[#E0D0F0]/40 mb-16">
+        <img
+          src="/image.webp"
+          alt="Arade Skincare Products"
+          width={1536}
+          height={1024}
+          loading="lazy"
+          decoding="async"
+          className="w-full h-auto object-cover"
+        />
+      </div>
+
+      {/* Content sections */}
+      <div className="space-y-12 mb-20">
+        {SECTIONS.map((section) => (
+          <section key={section.heading}>
+            <h2 className="text-2xl font-serif text-foreground mb-4">
+              {section.heading}
+            </h2>
+            <div className="space-y-4 text-foreground/70">
+              {section.paragraphs.map((paragraph) => (
+                <p key={paragraph.slice(0, 40)}>{paragraph}</p>
+              ))}
+            </div>
+          </section>
+        ))}
+        <p className="text-foreground/70">
+          Thank you for choosing Arade Shop and supporting our growing
+          business. We look forward to helping you find your next skincare
+          favourite.
         </p>
-      </div>
-
-      {/* Story */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center mb-20">
-        <div>
-          <h2 className="text-2xl font-serif text-foreground mb-4">Our Story</h2>
-          <div className="space-y-4 text-foreground/70">
-            <p>
-              Arade was born from a passion for beauty in all its forms and a belief
-              that everyone should feel confident in how they look and present
-              themselves. Founded in Canada, we set out to create a destination that
-              brings together the best in beauty, skincare, hair and fashion.
-            </p>
-            <p>
-              Every product in our collection is carefully selected from trusted
-              brands and suppliers. We focus on quality, authenticity and products
-              that truly make a difference in your daily routine.
-            </p>
-            <p>
-              Today, we serve customers across Canada and the United States,
-              helping thousands of people discover products they love.
-            </p>
-          </div>
-        </div>
-        <div className="rounded-2xl overflow-hidden bg-[#E0D0F0]/40">
-          <img src="/image.webp" alt="Arade Beauty Products" width={1536} height={1024} loading="lazy" decoding="async" className="w-full h-auto object-cover" />
-        </div>
-      </div>
-
-      {/* Values */}
-      <div className="mb-20">
-        <h2 className="text-2xl font-serif text-foreground mb-8 text-center">
-          Our Values
-        </h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          {[
-            {
-              Icon: Gem,
-              title: "Curated Quality",
-              description:
-                "Every product is carefully selected to meet our standards for quality, authenticity and value.",
-            },
-            {
-              Icon: Leaf,
-              title: "Trusted Selection",
-              description:
-                "We work with trusted brands and suppliers to bring you products you can rely on.",
-            },
-            {
-              Icon: Globe,
-              title: "Canada & USA",
-              description:
-                "Proudly serving customers across Canada and the United States with free delivery on orders over $180.",
-            },
-          ].map((value) => (
-            <div key={value.title} className="text-center p-6">
-              <value.Icon className="w-10 h-10 text-primary mx-auto mb-4" strokeWidth={1.5} />
-              <h3 className="text-lg font-semibold text-foreground mb-2">
-                {value.title}
-              </h3>
-              <p className="text-foreground/60">{value.description}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Categories */}
-      <div className="mb-20">
-        <h2 className="text-2xl font-serif text-foreground mb-8 text-center">
-          What We Offer
-        </h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {[
-            { name: "Beauty", desc: "Makeup, fragrances and beauty essentials." },
-            { name: "Skincare", desc: "Cleansers, moisturizers and skincare sets." },
-            { name: "Hair", desc: "Wigs, hair care and accessories." },
-            { name: "Fashion", desc: "Dresses, tops and fashion accessories." },
-          ].map((cat) => (
-            <div key={cat.name} className="bg-[#F3EAFB] rounded-xl p-6 text-center">
-              <h3 className="font-serif text-lg text-foreground mb-2">{cat.name}</h3>
-              <p className="text-sm text-foreground/60">{cat.desc}</p>
-            </div>
-          ))}
-        </div>
       </div>
 
       {/* CTA */}
@@ -117,7 +115,7 @@ export default function AboutPage() {
           Ready to Explore?
         </h2>
         <p className="text-foreground/60 mb-6 max-w-lg mx-auto">
-          Discover our full collection of beauty, skincare, hair and fashion products.
+          Discover our full collection of skincare and body-care products.
         </p>
         <a
           href="/shop"

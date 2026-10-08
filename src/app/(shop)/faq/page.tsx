@@ -29,6 +29,16 @@ export default function FaqPage() {
   return (
     <>
       <JsonLd data={faqSchema} />
+      <JsonLd
+        data={{
+          "@context": "https://schema.org",
+          "@type": "BreadcrumbList",
+          itemListElement: [
+            { "@type": "ListItem", position: 1, name: "Home", item: absoluteUrl("/") },
+            { "@type": "ListItem", position: 2, name: "FAQ", item: absoluteUrl("/faq") },
+          ],
+        }}
+      />
       <FaqContent />
     </>
   );
