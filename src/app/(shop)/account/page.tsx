@@ -55,6 +55,26 @@ export default function AccountPage() {
     }
   }, [profile, user]);
 
+  // Auto-request the welcome/coupon email once if this verified account has
+  // never received it (e.g. they confirmed before the post-verification
+  // welcome flow existed). Runs silently at most once per page load.
+  // NOTE: hooks must run unconditionally - this sits ABOVE the early returns
+  // below, otherwise the hook count changes when `loading` flips on refresh.
+  useEffect(() => {
+    if (
+      !loading &&
+      user &&
+      user.email_confirmed_at &&
+      profile &&
+      !profile.welcome_email_sent_at &&
+      !welcomeRequested.current
+    ) {
+      welcomeRequested.current = true;
+      requestWelcomeEmail(true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, user, profile]);
+
   if (loading) {
     return (
       <div className="min-h-[60vh] flex items-center justify-center">
@@ -147,24 +167,6 @@ export default function AccountPage() {
     setChangingPassword(false);
     setPasswordMessage("Password changed successfully.");
   };
-
-  // Auto-request the welcome/coupon email once if this verified account has
-  // never received it (e.g. they confirmed before the post-verification
-  // welcome flow existed). Runs silently at most once per page load.
-  useEffect(() => {
-    if (
-      !loading &&
-      user &&
-      user.email_confirmed_at &&
-      profile &&
-      !profile.welcome_email_sent_at &&
-      !welcomeRequested.current
-    ) {
-      welcomeRequested.current = true;
-      requestWelcomeEmail(true);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loading, user, profile]);
 
   const requestWelcomeEmail = async (silent = false) => {
     setWelcomeSending(true);
