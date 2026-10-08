@@ -21,10 +21,10 @@ const iconMap: Record<string, React.ReactNode> = {
 };
 
 const colorMap: Record<string, string> = {
-  beauty: "bg-[#c4956a]",
-  skincare: "bg-[#8b7355]",
-  hair: "bg-[#6b5b4a]",
-  fashion: "bg-[#5a4a3a]",
+  beauty: "bg-[#C48AE3]",
+  skincare: "bg-[#A05AD0]",
+  hair: "bg-[#7E45AB]",
+  fashion: "bg-[#6A3490]",
 };
 
 export default function CategorySection() {
@@ -75,7 +75,7 @@ export default function CategorySection() {
               key={cat.id}
               href={`/${cat.slug}`}
               className={`group relative ${
-                colorMap[cat.slug] || "bg-[#8b7355]"
+                colorMap[cat.slug] || "bg-[#A05AD0]"
               } rounded-2xl p-8 text-left transition-all duration-300 hover:shadow-xl hover:-translate-y-1 overflow-hidden min-h-[220px] flex flex-col justify-end`}
             >
               <div className="absolute top-6 right-6 w-16 h-16 bg-white/10 rounded-full flex items-center justify-center">

@@ -28,6 +28,7 @@ Run order matters only conceptually; all three are idempotent (safe to re-run):
 | `supabase/migrations/20260104_canada_post_shipping.sql` | `products.weight_grams` (default 250 g); `orders.shipping_method_code`, `shipping_method_name`, `tracking_number`, `label_url` | ✅ Applied 2026-09-29 |
 | `supabase/migrations/20260105_welcome_email_flag.sql` | `profiles.welcome_email_sent_at` (send-once guard) | ✅ Applied |
 | `supabase/migrations/20260106_welcome_coupon_30_days.sql` | Sets active first-order coupons to expire 30 days after issue | ✅ Applied (WELCOME20 = 30) |
+| `supabase/migrations/20261004_add_store_pickup.sql` | Store Pickup / Click & Collect: `orders.fulfillment_method`, `pickup_status` (NOT NULL DEFAULT 'preparing', explicit `picking` state in the admin API), `pickup_*` store/address/prep-time columns, pickup indexes. Idempotent. | ✅ Applied 2026-10-04 (columns verified present + insert probes passed) |
 
 **Rule: run SQL migrations BEFORE deploying dependent code** (Vercel redeploys
 automatically on push).

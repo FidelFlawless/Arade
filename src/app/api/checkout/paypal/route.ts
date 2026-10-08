@@ -48,7 +48,26 @@ async function getPayPalAccessToken(): Promise<string> {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { userId, items, shippingAddress, country, currency, couponCode, shippingMethod } = body;
+    const {
+      userId,
+      items,
+      shippingAddress,
+      country,
+      currency,
+      couponCode,
+      shippingMethod,
+      fulfillmentMethod,
+      pickupStoreName,
+      pickupStoreId,
+      pickupAddressLine1,
+      pickupAddressLine2,
+      pickupCity,
+      pickupStateProvince,
+      pickupPostalCode,
+      pickupCountry,
+      pickupPhone,
+      pickupPreparationTime,
+    } = body;
 
     // 1. Guest checkout: authentication is OPTIONAL. If a userId and bearer
     // token are provided, verify the token actually belongs to that user
@@ -94,19 +113,32 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Only Canada and USA are supported" }, { status: 400 });
     }
 
+    // Name + email are always required. The delivery address and phone are
+    // only required for shipping orders — in-store pickup needs neither (the
+    // customer collects the order at the store).
     if (
       !shippingAddress.first_name?.trim() ||
       !shippingAddress.last_name?.trim() ||
-      !isValidEmail(shippingAddress.email || "") ||
-      !shippingAddress.address_line1?.trim() ||
-      !shippingAddress.city?.trim() ||
-      !isValidShippingRegion(country, shippingAddress.province_state || "") ||
-      !isValidShippingPostalCode(country, shippingAddress.postal_code || "")
+      !isValidEmail(shippingAddress.email || "")
+    ) {
+      return NextResponse.json({ error: "Please provide a valid name and email address" }, { status: 400 });
+    }
+
+    if (
+      fulfillmentMethod !== "store_pickup" &&
+      (
+        !shippingAddress.address_line1?.trim() ||
+        !shippingAddress.city?.trim() ||
+        !isValidShippingRegion(country, shippingAddress.province_state || "") ||
+        !isValidShippingPostalCode(country, shippingAddress.postal_code || "")
+      )
     ) {
       return NextResponse.json({ error: "Please provide a complete and valid shipping address" }, { status: 400 });
     }
 
-    if (!shippingAddress.phone || !isValidNorthAmericanPhone(shippingAddress.phone)) {
+    if (fulfillmentMethod !== "store_pickup" &&
+      (!shippingAddress.phone || !isValidNorthAmericanPhone(shippingAddress.phone))
+    ) {
       return NextResponse.json(
         { error: "A valid Canada or United States phone number is required" },
         { status: 400 }
@@ -165,54 +197,63 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // 5. Delivery fee: live Canada Post rate for the customer's chosen
-    // service, re-quoted SERVER-SIDE. No flat-rate fallback: on Canada Post
-    // failure we return a controlled error and the customer can retry.
-    if (!shippingMethod || typeof shippingMethod.code !== "string") {
-      return NextResponse.json(
-        { error: "Please choose a shipping option" },
-        { status: 400 }
-      );
-    }
-
+    // 5. Delivery fee / fulfillment method.
+    //
+    //   * `store_pickup` => free online payment, no Canada Post. The amount the
+    //     customer pays via PayPal is exactly the payable subtotal (discount
+    //     applied) and the PayPal `shipping` breakdown value is `0.00`.
+    //   * `shipping` => existing Canada Post live-rate flow, untouched.
     let deliveryFee = 0;
-    let shippingMethodName = shippingMethod.code;
-    try {
-      const productIds = items.map((item: { productId: string }) => item.productId);
-      const { data: weightRows } = await supabaseAdmin
-        .from("products")
-        .select("id, weight_grams")
-        .in("id", productIds);
-      const totalWeightKg =
-        items.reduce((sum: number, item: { productId: string; quantity: number }) => {
-          const row = weightRows?.find((w) => w.id === item.productId);
-          const grams = (row?.weight_grams ?? DEFAULT_ITEM_WEIGHT_GRAMS) * item.quantity;
-          return sum + grams;
-        }, 0) / 1000;
+    let shippingMethodName: string | null = null;
 
-      const rates = await getCanadaPostRates({
-        destinationCountry: country,
-        destinationPostalCode: shippingAddress.postal_code,
-        weightKg: totalWeightKg,
-      });
-      const chosen = rates.find((r) => r.serviceCode === shippingMethod.code);
-      if (!chosen) {
+    if (fulfillmentMethod === "store_pickup") {
+      deliveryFee = 0;
+      shippingMethodName = null;
+    } else {
+      if (!shippingMethod || typeof shippingMethod.code !== "string") {
         return NextResponse.json(
-          { error: "The selected shipping option is no longer available. Please pick another one." },
+          { error: "Please choose a shipping option" },
           { status: 400 }
         );
       }
-      deliveryFee = chosen.price;
-      shippingMethodName = chosen.serviceName;
-    } catch (err) {
-      if (err instanceof CanadaPostError) {
-        console.error("Canada Post checkout rates error:", err.message);
-        return NextResponse.json(
-          { error: "Shipping is temporarily unavailable. Please try again in a moment." },
-          { status: 502 }
-        );
+
+      try {
+        const productIds = items.map((item: { productId: string }) => item.productId);
+        const { data: weightRows } = await supabaseAdmin
+          .from("products")
+          .select("id, weight_grams")
+          .in("id", productIds);
+        const totalWeightKg =
+          items.reduce((sum: number, item: { productId: string; quantity: number }) => {
+            const row = weightRows?.find((w) => w.id === item.productId);
+            const grams = (row?.weight_grams ?? DEFAULT_ITEM_WEIGHT_GRAMS) * item.quantity;
+            return sum + grams;
+          }, 0) / 1000;
+
+        const rates = await getCanadaPostRates({
+          destinationCountry: country,
+          destinationPostalCode: shippingAddress.postal_code,
+          weightKg: totalWeightKg,
+        });
+        const chosen = rates.find((r) => r.serviceCode === shippingMethod.code);
+        if (!chosen) {
+          return NextResponse.json(
+            { error: "The selected shipping option is no longer available. Please pick another one." },
+            { status: 400 }
+          );
+        }
+        deliveryFee = chosen.price;
+        shippingMethodName = chosen.serviceName;
+      } catch (err) {
+        if (err instanceof CanadaPostError) {
+          console.error("Canada Post checkout rates error:", err.message);
+          return NextResponse.json(
+            { error: "Shipping is temporarily unavailable. Please try again in a moment." },
+            { status: 502 }
+          );
+        }
+        throw err;
       }
-      throw err;
     }
 
     const total = Math.round((subtotal + deliveryFee) * 100) / 100;
@@ -262,9 +303,29 @@ export async function POST(req: NextRequest) {
         currency,
         payment_status: "pending",
         order_status: "pending",
+        // Fulfillment: pickup orders are free + no Canada Post; shipping orders
+        // keep the existing Canada Post fields. pickup_* columns are OMITTED
+        // (not null-ed) for shipping orders — pickup_status is NOT NULL
+        // DEFAULT 'preparing'.
+        fulfillment_method: fulfillmentMethod === "store_pickup" ? "store_pickup" : "shipping",
+        ...(fulfillmentMethod === "store_pickup"
+          ? {
+              pickup_status: "preparing",
+              pickup_store_id: pickupStoreId ?? null,
+              pickup_store_name: pickupStoreName ?? null,
+              pickup_address_line1: pickupAddressLine1 ?? null,
+              pickup_address_line2: pickupAddressLine2 ?? null,
+              pickup_city: pickupCity ?? null,
+              pickup_state_province: pickupStateProvince ?? null,
+              pickup_postal_code: pickupPostalCode ?? null,
+              pickup_country: (pickupCountry ?? "CA") === "US" ? "US" : "CA",
+              pickup_phone: pickupPhone ?? null,
+              pickup_preparation_time: pickupPreparationTime ?? null,
+            }
+          : {}),
         shipping_email: shippingAddress.email || null,
         coupon_code: appliedCouponCode,
-        shipping_method_code: shippingMethod.code,
+        shipping_method_code: shippingMethodName ? shippingMethod.code : null,
         shipping_method_name: shippingMethodName,
         shipping_first_name: shippingAddress.first_name,
         shipping_last_name: shippingAddress.last_name,
@@ -357,28 +418,35 @@ export async function POST(req: NextRequest) {
             quantity: item.quantity.toString(),
             category: "PHYSICAL_GOODS",
           })),
-          shipping: {
-            name: {
-              full_name: `${shippingAddress.first_name} ${shippingAddress.last_name}`.substring(0, 300),
-            },
-            address: {
-              address_line_1: shippingAddress.address_line1.substring(0, 300),
-              ...(shippingAddress.address_line2
-                ? { address_line_2: shippingAddress.address_line2.substring(0, 300) }
-                : {}),
-              admin_area_2: shippingAddress.city.substring(0, 120),
-              admin_area_1: shippingAddress.province_state.substring(0, 300),
-              postal_code: shippingAddress.postal_code.substring(0, 10),
-              country_code: country,
-            },
-          },
+          // Shipping orders carry the delivery address for PayPal; pickup
+          // orders send no address at all (nothing is being shipped).
+          ...(fulfillmentMethod === "store_pickup"
+            ? {}
+            : {
+                shipping: {
+                  name: {
+                    full_name: `${shippingAddress.first_name} ${shippingAddress.last_name}`.substring(0, 300),
+                  },
+                  address: {
+                    address_line_1: shippingAddress.address_line1.substring(0, 300),
+                    ...(shippingAddress.address_line2
+                      ? { address_line_2: shippingAddress.address_line2.substring(0, 300) }
+                      : {}),
+                    admin_area_2: shippingAddress.city.substring(0, 120),
+                    admin_area_1: shippingAddress.province_state.substring(0, 300),
+                    postal_code: shippingAddress.postal_code.substring(0, 10),
+                    country_code: country,
+                  },
+                },
+              }),
         },
       ],
       application_context: {
         brand_name: "Arade",
         locale: "en-US",
         landing_page: "BILLING",
-        shipping_preference: "SET_PROVIDED_ADDRESS",
+        // Pickup: hide any shipping address in PayPal (nothing is shipped).
+        shipping_preference: fulfillmentMethod === "store_pickup" ? "NO_SHIPPING" : "SET_PROVIDED_ADDRESS",
         user_action: "PAY_NOW",
         // Used when PayPal falls back to a full-page redirect (mobile
         // browsers with blocked popups). The success page captures the

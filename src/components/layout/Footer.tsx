@@ -30,7 +30,7 @@ const footerLinks = {
 export default function Footer() {
   
   return (
-    <footer className="bg-[#2c1810] text-white mt-auto">
+    <footer className="bg-[#402052] text-white mt-auto">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 lg:py-16">
         {/* Top section: Brand + Newsletter on left, links on right */}
         <div className="flex flex-col lg:flex-row gap-12 lg:gap-16">

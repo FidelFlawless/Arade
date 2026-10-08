@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useAuth } from "@/components/providers/AuthProvider";
 import { createClient } from "@/lib/supabase/client";
-import { PackageCheck, Loader2, ChevronRight } from "lucide-react";
+import { PackageCheck, Loader2, ChevronRight, Store } from "lucide-react";
 import BackButton from "@/components/ui/BackButton";
 
 interface OrderRow {
@@ -16,6 +16,7 @@ interface OrderRow {
   payment_status: string;
   currency: string;
   total: number;
+  fulfillment_method?: "shipping" | "store_pickup" | null;
   order_items: { id: string; products?: { name: string; images: string[] } | null }[];
 }
 
@@ -120,8 +121,14 @@ export default function OrdersPage() {
                   )}
                 </div>
                 <div className="min-w-0">
-                  <p className="font-medium text-foreground wrap-break-word">
+                  <p className="font-medium text-foreground wrap-break-word flex items-center gap-2">
                     Order {order.order_number}
+                    {order.fulfillment_method === "store_pickup" && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
+                        <Store className="w-3 h-3" />
+                        Store Pickup
+                      </span>
+                    )}
                   </p>
                   <p className="text-sm text-foreground/50">
                     {new Date(order.created_at).toLocaleDateString("en-US", {

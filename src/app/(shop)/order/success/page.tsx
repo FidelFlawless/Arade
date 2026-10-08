@@ -1,10 +1,16 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { CheckCircle, Package, Loader2, ArrowRight } from "lucide-react";
 import { useCart } from "@/components/providers/CartProvider";
+
+declare global {
+  interface Window {
+    gtag?: (...args: unknown[]) => void;
+  }
+}
 
 function OrderSuccessContent() {
   const searchParams = useSearchParams();
@@ -21,6 +27,9 @@ function OrderSuccessContent() {
   } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  // GA4 purchase conversion fires exactly once per page load, after the order
+  // has been verified as paid (works for both Stripe and PayPal flows).
+  const purchaseReportedRef = useRef(false);
 
   useEffect(() => {
     clearCart();
@@ -97,6 +106,19 @@ function OrderSuccessContent() {
     // No params — show generic success
     setLoading(false);
   }, [sessionId, paypalOrderId, paypalToken, clearCart]);
+
+  // GA4 ecommerce purchase event - Merchant Center reads this (via the GA4
+  // link) to attribute conversions from free listings and Shopping ads.
+  useEffect(() => {
+    if (!order || purchaseReportedRef.current) return;
+    purchaseReportedRef.current = true;
+    if (typeof window === "undefined" || typeof window.gtag !== "function") return;
+    window.gtag("event", "purchase", {
+      transaction_id: order.order_number,
+      value: Number(order.total),
+      currency: order.currency === "USD" ? "USD" : "CAD",
+    });
+  }, [order]);
 
   if (loading) {
     return (

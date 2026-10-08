@@ -121,7 +121,7 @@ export default function AdminCategoriesPage() {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-foreground mb-2">Name *</label>
+                <label className="block text-sm font-medium text-foreground mb-2">Name</label>
                 <input type="text" value={form.name} required
                   onChange={(e) => setForm({ ...form, name: e.target.value, slug: generateSlug(e.target.value) })}
                   className="w-full px-4 py-2.5 border border-border rounded-lg text-sm outline-none" placeholder="Category Name" />

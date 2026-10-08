@@ -54,7 +54,7 @@ export default async function HomePage() {
         }}
       />
       {/* Hero Section */}
-      <section className="relative bg-[#d5c4a8] overflow-hidden">
+      <section className="relative bg-[#E0D0F0] overflow-hidden">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 lg:grid-cols-[5fr_5fr] gap-6 lg:gap-8 items-center min-h-87.5 lg:min-h-130">
             {/* Left content */}
@@ -179,7 +179,7 @@ export default async function HomePage() {
       {/* New Collection Banner */}
       <section className="py-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="relative bg-[#2c1810] overflow-hidden rounded-2xl">
+          <div className="relative bg-[#402052] overflow-hidden rounded-2xl">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8 items-center min-h-[320px] sm:min-h-[380px] lg:min-h-[400px] px-6 sm:px-8 lg:px-12">
             {/* Left content */}
             <div className="py-8 sm:py-12 lg:py-16 z-10">
@@ -218,7 +218,7 @@ export default async function HomePage() {
 
 
       {/* Newsletter */}
-      <section className="py-12 lg:py-16 bg-[#3d2a1e]">
+      <section className="py-12 lg:py-16 bg-[#4A2A62]">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6 lg:gap-12">
             <div className="text-center lg:text-left">

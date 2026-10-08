@@ -103,7 +103,7 @@ export default function ReviewForm({ productId }: ReviewFormProps) {
         {/* Star Rating */}
         <div>
           <label className="block text-sm font-medium text-foreground/70 mb-2">
-            Rating *
+            Rating
           </label>
           <div className="flex items-center gap-1">
             {[1, 2, 3, 4, 5].map((star) => (

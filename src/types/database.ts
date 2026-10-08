@@ -291,6 +291,18 @@ export interface Order {
   user_id: string;
   order_number: string;
   status: "pending" | "processing" | "shipped" | "delivered" | "cancelled";
+  fulfillment_method?: "shipping" | "store_pickup";
+  pickup_status?: "preparing" | "picking" | "ready" | "picked_up" | "cancelled";
+  pickup_store_id?: string | null;
+  pickup_store_name?: string | null;
+  pickup_address_line1?: string | null;
+  pickup_address_line2?: string | null;
+  pickup_city?: string | null;
+  pickup_state_province?: string | null;
+  pickup_postal_code?: string | null;
+  pickup_country?: "CA" | "US" | null;
+  pickup_phone?: string | null;
+  pickup_preparation_time?: string | null;
   subtotal: number;
   delivery_fee: number;
   discount: number;
@@ -298,6 +310,10 @@ export interface Order {
   currency: "CAD" | "USD";
   payment_status: "pending" | "paid" | "failed" | "refunded";
   stripe_session_id: string | null;
+  shipping_method_code?: string | null;
+  shipping_method_name?: string | null;
+  tracking_number?: string | null;
+  label_url?: string | null;
   shipping_first_name: string;
   shipping_last_name: string;
   shipping_email: string;
@@ -352,6 +368,18 @@ export interface OrderInsert {
   user_id?: string | null;
   order_number: string;
   status?: "pending" | "processing" | "shipped" | "delivered" | "cancelled";
+  fulfillment_method?: "shipping" | "store_pickup";
+  pickup_status?: "preparing" | "picking" | "ready" | "picked_up" | "cancelled";
+  pickup_store_id?: string | null;
+  pickup_store_name?: string | null;
+  pickup_address_line1?: string | null;
+  pickup_address_line2?: string | null;
+  pickup_city?: string | null;
+  pickup_state_province?: string | null;
+  pickup_postal_code?: string | null;
+  pickup_country?: "CA" | "US" | null;
+  pickup_phone?: string | null;
+  pickup_preparation_time?: string | null;
   subtotal: number;
   delivery_fee: number;
   discount?: number;
@@ -359,6 +387,10 @@ export interface OrderInsert {
   currency: "CAD" | "USD";
   payment_status?: "pending" | "paid" | "failed" | "refunded";
   stripe_session_id?: string | null;
+  shipping_method_code?: string | null;
+  shipping_method_name?: string | null;
+  tracking_number?: string | null;
+  label_url?: string | null;
   shipping_first_name: string;
   shipping_last_name: string;
   shipping_email: string;
@@ -376,8 +408,24 @@ export interface OrderInsert {
 
 export interface OrderUpdate {
   status?: "pending" | "processing" | "shipped" | "delivered" | "cancelled";
+  fulfillment_method?: "shipping" | "store_pickup";
+  pickup_status?: "preparing" | "picking" | "ready" | "picked_up" | "cancelled";
+  pickup_store_id?: string | null;
+  pickup_store_name?: string | null;
+  pickup_address_line1?: string | null;
+  pickup_address_line2?: string | null;
+  pickup_city?: string | null;
+  pickup_state_province?: string | null;
+  pickup_postal_code?: string | null;
+  pickup_country?: "CA" | "US" | null;
+  pickup_phone?: string | null;
+  pickup_preparation_time?: string | null;
   payment_status?: "pending" | "paid" | "failed" | "refunded";
   stripe_session_id?: string | null;
+  shipping_method_code?: string | null;
+  shipping_method_name?: string | null;
+  tracking_number?: string | null;
+  label_url?: string | null;
   notes?: string | null;
   updated_at?: string;
 }

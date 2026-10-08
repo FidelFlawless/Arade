@@ -33,7 +33,26 @@ export async function POST(req: NextRequest) {
   try {
     const stripe = getStripe();
     const body = await req.json();
-    const { userId, items, shippingAddress, country, currency, couponCode, shippingMethod } = body;
+    const {
+      userId,
+      items,
+      shippingAddress,
+      country,
+      currency,
+      couponCode,
+      shippingMethod,
+      fulfillmentMethod,
+      pickupStoreName,
+      pickupStoreId,
+      pickupAddressLine1,
+      pickupAddressLine2,
+      pickupCity,
+      pickupStateProvince,
+      pickupPostalCode,
+      pickupCountry,
+      pickupPhone,
+      pickupPreparationTime,
+    } = body;
 
     // 1. Guest checkout: authentication is OPTIONAL. If a userId and bearer
     // token are provided, verify the token actually belongs to that user
@@ -79,19 +98,32 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Only Canada and USA are supported" }, { status: 400 });
     }
 
+    // Name + email are always required. The delivery address and phone are
+    // only required for shipping orders — in-store pickup needs neither (the
+    // customer collects the order at the store).
     if (
       !shippingAddress.first_name?.trim() ||
       !shippingAddress.last_name?.trim() ||
-      !isValidEmail(shippingAddress.email || "") ||
-      !shippingAddress.address_line1?.trim() ||
-      !shippingAddress.city?.trim() ||
-      !isValidShippingRegion(country, shippingAddress.province_state || "") ||
-      !isValidShippingPostalCode(country, shippingAddress.postal_code || "")
+      !isValidEmail(shippingAddress.email || "")
+    ) {
+      return NextResponse.json({ error: "Please provide a valid name and email address" }, { status: 400 });
+    }
+
+    if (
+      fulfillmentMethod !== "store_pickup" &&
+      (
+        !shippingAddress.address_line1?.trim() ||
+        !shippingAddress.city?.trim() ||
+        !isValidShippingRegion(country, shippingAddress.province_state || "") ||
+        !isValidShippingPostalCode(country, shippingAddress.postal_code || "")
+      )
     ) {
       return NextResponse.json({ error: "Please provide a complete and valid shipping address" }, { status: 400 });
     }
 
-    if (!shippingAddress.phone || !isValidNorthAmericanPhone(shippingAddress.phone)) {
+    if (fulfillmentMethod !== "store_pickup" &&
+      (!shippingAddress.phone || !isValidNorthAmericanPhone(shippingAddress.phone))
+    ) {
       return NextResponse.json(
         { error: "A valid Canada or United States phone number is required" },
         { status: 400 }
@@ -150,55 +182,67 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // 5. Delivery fee: live Canada Post rate for the customer's chosen
-    // service, re-quoted SERVER-SIDE (never trust the browser's price).
-    // No flat-rate fallback: on Canada Post failure we return a controlled
-    // error and the customer can retry.
-    if (!shippingMethod || typeof shippingMethod.code !== "string") {
-      return NextResponse.json(
-        { error: "Please choose a shipping option" },
-        { status: 400 }
-      );
-    }
-
+    // 5. Delivery fee / fulfillment method.
+    //
+    //   * `store_pickup` => the customer pays nothing online for shipping.
+    //     Delivery fee = 0, shipping_method tracking fields = null, and the
+    //     whole Canada Post rating path is skipped. This is the ONLY code path
+    //     that can authorise a pickup order, so it enforces the business rule
+    //     entirely server-side (the browser could otherwise smuggle a
+    //     shippingMethod in).
+    //   * `shipping` (default) => existing Canada Post live-rate flow,
+    //     untouched.
     let deliveryFee = 0;
-    let shippingMethodName = shippingMethod.code;
-    try {
-      const productIds = items.map((item: { productId: string }) => item.productId);
-      const { data: weightRows } = await supabaseAdmin
-        .from("products")
-        .select("id, weight_grams")
-        .in("id", productIds);
-      const totalWeightKg =
-        items.reduce((sum: number, item: { productId: string; quantity: number }) => {
-          const row = weightRows?.find((w) => w.id === item.productId);
-          const grams = (row?.weight_grams ?? DEFAULT_ITEM_WEIGHT_GRAMS) * item.quantity;
-          return sum + grams;
-        }, 0) / 1000;
+    let shippingMethodName: string | null = null;
 
-      const rates = await getCanadaPostRates({
-        destinationCountry: country,
-        destinationPostalCode: shippingAddress.postal_code,
-        weightKg: totalWeightKg,
-      });
-      const chosen = rates.find((r) => r.serviceCode === shippingMethod.code);
-      if (!chosen) {
+    if (fulfillmentMethod === "store_pickup") {
+      deliveryFee = 0;
+      shippingMethodName = null;
+    } else {
+      if (!shippingMethod || typeof shippingMethod.code !== "string") {
         return NextResponse.json(
-          { error: "The selected shipping option is no longer available. Please pick another one." },
+          { error: "Please choose a shipping option" },
           { status: 400 }
         );
       }
-      deliveryFee = chosen.price;
-      shippingMethodName = chosen.serviceName;
-    } catch (err) {
-      if (err instanceof CanadaPostError) {
-        console.error("Canada Post checkout rates error:", err.message);
-        return NextResponse.json(
-          { error: "Shipping is temporarily unavailable. Please try again in a moment." },
-          { status: 502 }
-        );
+
+      try {
+        const productIds = items.map((item: { productId: string }) => item.productId);
+        const { data: weightRows } = await supabaseAdmin
+          .from("products")
+          .select("id, weight_grams")
+          .in("id", productIds);
+        const totalWeightKg =
+          items.reduce((sum: number, item: { productId: string; quantity: number }) => {
+            const row = weightRows?.find((w) => w.id === item.productId);
+            const grams = (row?.weight_grams ?? DEFAULT_ITEM_WEIGHT_GRAMS) * item.quantity;
+            return sum + grams;
+          }, 0) / 1000;
+
+        const rates = await getCanadaPostRates({
+          destinationCountry: country,
+          destinationPostalCode: shippingAddress.postal_code,
+          weightKg: totalWeightKg,
+        });
+        const chosen = rates.find((r) => r.serviceCode === shippingMethod.code);
+        if (!chosen) {
+          return NextResponse.json(
+            { error: "The selected shipping option is no longer available. Please pick another one." },
+            { status: 400 }
+          );
+        }
+        deliveryFee = chosen.price;
+        shippingMethodName = chosen.serviceName;
+      } catch (err) {
+        if (err instanceof CanadaPostError) {
+          console.error("Canada Post checkout rates error:", err.message);
+          return NextResponse.json(
+            { error: "Shipping is temporarily unavailable. Please try again in a moment." },
+            { status: 502 }
+          );
+        }
+        throw err;
       }
-      throw err;
     }
 
     const total = Math.round((subtotal + deliveryFee) * 100) / 100;
@@ -287,9 +331,28 @@ export async function POST(req: NextRequest) {
         currency,
         payment_status: "pending",
         order_status: "pending",
+        fulfillment_method: fulfillmentMethod === "store_pickup" ? "store_pickup" : "shipping",
+        // pickup_* columns are OMITTED (not null-ed) for shipping orders so the
+        // DB defaults apply — pickup_status is NOT NULL DEFAULT 'preparing'.
+        ...(fulfillmentMethod === "store_pickup"
+          ? {
+              pickup_status: "preparing",
+              pickup_store_id: pickupStoreId ?? null,
+              pickup_store_name: pickupStoreName ?? null,
+              pickup_address_line1: pickupAddressLine1 ?? null,
+              pickup_address_line2: pickupAddressLine2 ?? null,
+              pickup_city: pickupCity ?? null,
+              pickup_state_province: pickupStateProvince ?? null,
+              pickup_postal_code: pickupPostalCode ?? null,
+              pickup_country: (pickupCountry ?? "CA") === "US" ? "US" : "CA",
+              pickup_phone: pickupPhone ?? null,
+              pickup_preparation_time: pickupPreparationTime ?? null,
+            }
+          : {}),
         shipping_email: shippingAddress.email || null,
         coupon_code: appliedCouponCode,
-        shipping_method_code: shippingMethod.code,
+        // Shipping fields (Canada Post): null for pickup, real values for shipping.
+        shipping_method_code: shippingMethodName ? shippingMethod.code : null,
         shipping_method_name: shippingMethodName,
         shipping_first_name: shippingAddress.first_name,
         shipping_last_name: shippingAddress.last_name,
@@ -352,6 +415,7 @@ export async function POST(req: NextRequest) {
         order_id: order.id,
         order_number: order.order_number,
         user_id: userId || "guest",
+        fulfillment_method: fulfillmentMethod ?? "shipping",
         coupon_code: appliedCouponCode || "",
       },
       success_url: `${baseUrl}/order/success?session_id={CHECKOUT_SESSION_ID}`,

@@ -55,6 +55,8 @@ const PAYPAL_CLIENT_ID = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID || "";
 
 export default function CheckoutPage() {
   const [checkoutStep, setCheckoutStep] = useState<"shipping" | "payment">("shipping");
+  // Delivery method: Canada Post shipping (default) or free in-store pickup.
+  const [fulfillmentMethod, setFulfillmentMethod] = useState<"shipping" | "store_pickup">("shipping");
   const [form, setForm] = useState<ShippingForm>({
     first_name: "",
     last_name: "",
@@ -138,6 +140,11 @@ export default function CheckoutPage() {
     free_delivery_threshold: 180,
     delivery_fee_cad: 20,
     delivery_fee_usd: 14.29,
+    // Optional pickup-store configuration. Left blank until the client
+    // supplies the real store details; the UI falls back to generic copy.
+    pickup_location: "",
+    pickup_address: "",
+    pickup_preparation_minutes: "",
   });
 
   useEffect(() => {
@@ -146,6 +153,9 @@ export default function CheckoutPage() {
         free_delivery_threshold: Number(data.free_delivery_threshold) || 180,
         delivery_fee_cad: Number(data.delivery_fee_cad) || 20,
         delivery_fee_usd: Number(data.delivery_fee_usd) || 14.29,
+        pickup_location: typeof data.pickup_location === "string" ? data.pickup_location : "",
+        pickup_address: typeof data.pickup_address === "string" ? data.pickup_address : "",
+        pickup_preparation_minutes: data.pickup_preparation_minutes != null ? String(data.pickup_preparation_minutes) : "",
       });
     }).catch(() => {});
   }, []);
@@ -157,7 +167,8 @@ export default function CheckoutPage() {
     (sum, item) => sum + item[priceKey] * item.quantity,
     0
   );
-  const deliveryFee = selectedRate?.price ?? 0;
+  // Pickup is always free; shipping uses the selected live Canada Post rate.
+  const deliveryFee = fulfillmentMethod === "store_pickup" ? 0 : (selectedRate?.price ?? 0);
   const discount = appliedCoupon?.discount || 0;
   const payableSubtotal = Math.max(0, subtotal - discount);
   const total = payableSubtotal + deliveryFee;
@@ -245,21 +256,26 @@ export default function CheckoutPage() {
     if (!form.email.trim()) newErrors.email = "Email is required";
     else if (!isValidEmail(form.email))
       newErrors.email = "Invalid email address";
-    if (!form.address_line1.trim()) newErrors.address_line1 = "Address is required";
-    if (!form.city.trim()) newErrors.city = "City is required";
-    if (!form.province_state) newErrors.province_state = "Province/State is required";
-    else if (!isValidShippingRegion(form.country, form.province_state))
-      newErrors.province_state = "Select a valid province or state";
-    if (!form.postal_code.trim()) newErrors.postal_code = "Postal/ZIP code is required";
-    else if (!isValidShippingPostalCode(form.country, form.postal_code))
-      newErrors.postal_code = form.country === "CA" ? "Enter a valid Canadian postal code" : "Enter a valid US ZIP code";
-    else if (form.province_state) {
-      const mismatch = provincePostalMismatch(form.country, form.province_state, form.postal_code);
-      if (mismatch) newErrors.postal_code = mismatch;
-    }
-    if (!form.phone.trim()) newErrors.phone = "Phone number is required";
-    else if (!isValidNorthAmericanPhone(form.phone)) {
-      newErrors.phone = "Enter a valid Canada or United States phone number";
+
+    // In-store pickup needs only a name and email - no delivery address,
+    // province, postal code or phone (the store already knows where it is).
+    if (fulfillmentMethod === "shipping") {
+      if (!form.address_line1.trim()) newErrors.address_line1 = "Address is required";
+      if (!form.city.trim()) newErrors.city = "City is required";
+      if (!form.province_state) newErrors.province_state = "Province/State is required";
+      else if (!isValidShippingRegion(form.country, form.province_state))
+        newErrors.province_state = "Select a valid province or state";
+      if (!form.postal_code.trim()) newErrors.postal_code = "Postal/ZIP code is required";
+      else if (!isValidShippingPostalCode(form.country, form.postal_code))
+        newErrors.postal_code = form.country === "CA" ? "Enter a valid Canadian postal code" : "Enter a valid US ZIP code";
+      else if (form.province_state) {
+        const mismatch = provincePostalMismatch(form.country, form.province_state, form.postal_code);
+        if (mismatch) newErrors.postal_code = mismatch;
+      }
+      if (!form.phone.trim()) newErrors.phone = "Phone number is required";
+      else if (!isValidNorthAmericanPhone(form.phone)) {
+        newErrors.phone = "Enter a valid Canada or United States phone number";
+      }
     }
 
     setErrors(newErrors);
@@ -287,7 +303,7 @@ export default function CheckoutPage() {
       quantity: item.quantity,
     })), [cartItems]);
 
-  // ─── Step 1 -> Step 2: Validate shipping, fetch live Canada Post rates ──
+  // ─── Step 1 -> Step 2: Validate, then fetch live Canada Post rates ──
   const handleContinueToPayment = async () => {
     setPaymentError("");
     const errs = validateForm();
@@ -304,6 +320,16 @@ export default function CheckoutPage() {
           break;
         }
       }
+      return;
+    }
+
+    // In-store pickup: no Canada Post involvement at all - go straight to
+    // payment. Pickup is free and fulfilled manually from the store.
+    if (fulfillmentMethod === "store_pickup") {
+      setRatesError("");
+      setSelectedRate(null);
+      setCheckoutStep("payment");
+      window.scrollTo({ top: 0, behavior: "smooth" });
       return;
     }
 
@@ -364,6 +390,20 @@ export default function CheckoutPage() {
           country: form.country,
           currency,
           couponCode: appliedCoupon?.code || null,
+          fulfillmentMethod,
+          // Pickup-store snapshot (server validates and stores it on the order).
+          pickupStoreId: null,
+          pickupStoreName: storeSettings.pickup_location || null,
+          pickupAddressLine1: storeSettings.pickup_address ? storeSettings.pickup_address.split("\n")[0] : null,
+          pickupAddressLine2: storeSettings.pickup_address ? storeSettings.pickup_address.split("\n")[1] || null : null,
+          pickupCity: null,
+          pickupStateProvince: null,
+          pickupPostalCode: null,
+          pickupCountry: "CA",
+          pickupPhone: null,
+          pickupPreparationTime: storeSettings.pickup_preparation_minutes
+            ? `${storeSettings.pickup_preparation_minutes} minutes`
+            : null,
           shippingMethod: selectedRate ? { code: selectedRate.serviceCode, name: selectedRate.serviceName } : null,
         }),
       });
@@ -380,7 +420,7 @@ export default function CheckoutPage() {
       setPaymentError("Unable to start checkout. Please check your connection and try again.");
       setLoading(false);
     }
-  }, [user, form.country, currency, appliedCoupon, buildItems, buildShippingAddress, selectedRate, supabase]);
+  }, [user, form.country, currency, appliedCoupon, fulfillmentMethod, storeSettings, buildItems, buildShippingAddress, selectedRate, supabase]);
 
   // ─── PayPal checkout ─────────────────────────────────────────
   const handleCreatePayPalOrder = useCallback(async () => {
@@ -400,6 +440,20 @@ export default function CheckoutPage() {
         country: form.country,
         currency,
         couponCode: appliedCoupon?.code || null,
+        fulfillmentMethod,
+        // Pickup-store snapshot (server validates and stores it on the order).
+        pickupStoreId: null,
+        pickupStoreName: storeSettings.pickup_location || null,
+        pickupAddressLine1: storeSettings.pickup_address ? storeSettings.pickup_address.split("\n")[0] : null,
+        pickupAddressLine2: storeSettings.pickup_address ? storeSettings.pickup_address.split("\n")[1] || null : null,
+        pickupCity: null,
+        pickupStateProvince: null,
+        pickupPostalCode: null,
+        pickupCountry: "CA",
+        pickupPhone: null,
+        pickupPreparationTime: storeSettings.pickup_preparation_minutes
+          ? `${storeSettings.pickup_preparation_minutes} minutes`
+          : null,
         shippingMethod: selectedRate ? { code: selectedRate.serviceCode, name: selectedRate.serviceName } : null,
       }),
     });
@@ -415,7 +469,7 @@ export default function CheckoutPage() {
     sessionStorage.setItem("paypal_order_number", data.orderNumber);
 
     return data.paypalOrderId;
-  }, [user, form.country, currency, appliedCoupon, buildItems, buildShippingAddress, selectedRate, supabase]);
+  }, [user, form.country, currency, appliedCoupon, fulfillmentMethod, storeSettings, buildItems, buildShippingAddress, selectedRate, supabase]);
 
   const handlePayPalApprove = useCallback(async (data: { orderID: string }) => {
     const res = await fetch("/api/checkout/paypal/capture", {
@@ -623,16 +677,95 @@ export default function CheckoutPage() {
 
           {/* ═══ STEP 1: Shipping ═══ */}
           {checkoutStep === "shipping" && (
+            <>
+            {/* Delivery Method */}
+            <div className="card mb-4">
+              <h2 className="text-lg font-semibold text-foreground mb-4">
+                Delivery Method
+              </h2>
+              <div className="space-y-3">
+                <label
+                  className={`flex items-start gap-3 p-4 border-2 rounded-lg cursor-pointer transition-colors ${
+                    fulfillmentMethod === "shipping"
+                      ? "border-primary bg-primary/5"
+                      : "border-border hover:border-foreground/20"
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="fulfillmentMethod"
+                    value="shipping"
+                    checked={fulfillmentMethod === "shipping"}
+                    onChange={() => {
+                      setFulfillmentMethod("shipping");
+                      setPaymentError("");
+                    }}
+                    className="w-4 h-4 mt-0.5 accent-[var(--primary)]"
+                  />
+                  <span className="flex-1">
+                    <span className="block font-medium text-foreground">Ship to my address</span>
+                    <span className="block text-xs text-foreground/50 mt-0.5">
+                      Delivered by Canada Post — live rates calculated for your address at checkout.
+                    </span>
+                  </span>
+                </label>
+                <label
+                  className={`flex items-start gap-3 p-4 border-2 rounded-lg cursor-pointer transition-colors ${
+                    fulfillmentMethod === "store_pickup"
+                      ? "border-primary bg-primary/5"
+                      : "border-border hover:border-foreground/20"
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="fulfillmentMethod"
+                    value="store_pickup"
+                    checked={fulfillmentMethod === "store_pickup"}
+                    onChange={() => {
+                      setFulfillmentMethod("store_pickup");
+                      setPaymentError("");
+                    }}
+                    className="w-4 h-4 mt-0.5 accent-[var(--primary)]"
+                  />
+                  <span className="flex-1">
+                    <span className="block font-medium text-foreground">
+                      Pick up in store{" "}
+                      <span className="ml-1 inline-block px-2 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-700 align-middle">FREE</span>
+                    </span>
+                    <span className="block text-xs text-foreground/50 mt-0.5">
+                      Pay online, then collect your order at the store when it's ready — no shipping fee.
+                    </span>
+                  </span>
+                </label>
+              </div>
+
+              {fulfillmentMethod === "store_pickup" && (
+                <div className="mt-4 rounded-lg bg-muted/60 border border-border px-4 py-3 text-sm">
+                  <p className="font-medium text-foreground">
+                    {storeSettings.pickup_location || "Arade store pickup"}
+                  </p>
+                  {storeSettings.pickup_address && (
+                    <p className="text-foreground/60 whitespace-pre-line mt-1">{storeSettings.pickup_address}</p>
+                  )}
+                  <p className="text-foreground/60 mt-1">
+                    {storeSettings.pickup_preparation_minutes
+                      ? `Ready in approximately ${storeSettings.pickup_preparation_minutes} minutes after payment.`
+                      : "We'll email you when your order is ready for pickup."}
+                  </p>
+                </div>
+              )}
+            </div>
+
             <div className="card mb-6">
               <h2 className="text-lg font-semibold text-foreground mb-6">
-                Shipping Information
+                {fulfillmentMethod === "store_pickup" ? "Contact Information" : "Shipping Information"}
               </h2>
 
               <div className="space-y-4">
                 {/* Country */}
                 <div>
                   <label className="block text-sm font-medium text-foreground mb-2">
-                    Country *
+                    Country
                   </label>
                   <select
                     value={form.country}
@@ -652,7 +785,7 @@ export default function CheckoutPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-foreground mb-2">
-                      First Name *
+                      First Name
                     </label>
                     <input
                       type="text"
@@ -670,7 +803,7 @@ export default function CheckoutPage() {
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-foreground mb-2">
-                      Last Name *
+                      Last Name
                     </label>
                     <input
                       type="text"
@@ -692,7 +825,7 @@ export default function CheckoutPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-foreground mb-2">
-                      Email *
+                      Email
                     </label>
                     <input
                       type="email"
@@ -709,122 +842,128 @@ export default function CheckoutPage() {
                       <p className="text-xs text-red-600 mt-1">{errors.email}</p>
                     )}
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-foreground mb-2">
-                      Phone *
-                    </label>
-                    <input
-                      type="tel"
-                      value={form.phone}
-                      onChange={(e) => updateForm("phone", e.target.value)}
-                      className={`input ${errors.phone ? "border-red-500" : ""}`}
-                      placeholder="+1 (555) 123-4567"
-                      id="checkout-phone"
-                      autoComplete="tel"
-                      inputMode="tel"
-                      required
-                    />
-                    {errors.phone && <p className="text-xs text-red-600 mt-1">{errors.phone}</p>}
-                  </div>
+                  {fulfillmentMethod === "shipping" && (
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-2">
+                        Phone
+                      </label>
+                      <input
+                        type="tel"
+                        value={form.phone}
+                        onChange={(e) => updateForm("phone", e.target.value)}
+                        className={`input ${errors.phone ? "border-red-500" : ""}`}
+                        placeholder="+1 (555) 123-4567"
+                        id="checkout-phone"
+                        autoComplete="tel"
+                        inputMode="tel"
+                        required
+                      />
+                      {errors.phone && <p className="text-xs text-red-600 mt-1">{errors.phone}</p>}
+                    </div>
+                  )}
                 </div>
 
-                {/* Address */}
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-2">
-                    Street Address *
-                  </label>
-                  <input
-                    type="text"
-                    value={form.address_line1}
-                    onChange={(e) => updateForm("address_line1", e.target.value)}
-                    className={`input ${errors.address_line1 ? "input-error" : ""}`}
-                    placeholder="123 Main Street"
-                      id="checkout-address_line1"
-                      autoComplete="address-line1"
-                      required
-                    />
-                    {errors.address_line1 && (
-                      <p className="text-xs text-red-600 mt-1">{errors.address_line1}</p>
-                    )}
-                </div>
+                {/* Address fields (shipping only - pickup orders need no delivery address) */}
+                {fulfillmentMethod === "shipping" && (
+                  <>
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-2">
+                        Street Address
+                      </label>
+                      <input
+                        type="text"
+                        value={form.address_line1}
+                        onChange={(e) => updateForm("address_line1", e.target.value)}
+                        className={`input ${errors.address_line1 ? "input-error" : ""}`}
+                        placeholder="123 Main Street"
+                        id="checkout-address_line1"
+                        autoComplete="address-line1"
+                        required
+                      />
+                      {errors.address_line1 && (
+                        <p className="text-xs text-red-600 mt-1">{errors.address_line1}</p>
+                      )}
+                    </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-2">
-                    Apartment, Suite, Unit (Optional)
-                  </label>
-                  <input
-                    type="text"
-                    value={form.address_line2}
-                    onChange={(e) => updateForm("address_line2", e.target.value)}
-                    className="input"
-                    placeholder="Apt 4B"
-                    autoComplete="address-line2"
-                  />
-                </div>
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-2">
+                        Apartment, Suite, Unit (Optional)
+                      </label>
+                      <input
+                        type="text"
+                        value={form.address_line2}
+                        onChange={(e) => updateForm("address_line2", e.target.value)}
+                        className="input"
+                        placeholder="Apt 4B"
+                        autoComplete="address-line2"
+                      />
+                    </div>
 
-                {/* City, Province, Postal */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-foreground mb-2">
-                      City *
-                    </label>
-                    <input
-                      type="text"
-                      value={form.city}
-                      onChange={(e) => updateForm("city", e.target.value)}
-                      className={`input ${errors.city ? "input-error" : ""}`}
-                      placeholder="Toronto"
-                      id="checkout-city"
-                      autoComplete="address-level2"
-                      required
-                    />
-                    {errors.city && (
-                      <p className="text-xs text-red-600 mt-1">{errors.city}</p>
-                    )}
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-foreground mb-2">
-                      Province/State *
-                    </label>
-                    <select
-                      value={form.province_state}
-                      onChange={(e) => updateForm("province_state", e.target.value)}
-                      className={`input ${errors.province_state ? "input-error" : ""}`}
-                      id="checkout-province_state"
-                      autoComplete="address-level1"
-                      required
-                    >
-                      <option value="">Select...</option>
-                      {provinces.map((p) => (
-                        <option key={p.code} value={p.code}>
-                          {p.name}
-                        </option>
-                      ))}
-                    </select>
-                    {errors.province_state && (
-                      <p className="text-xs text-red-600 mt-1">{errors.province_state}</p>
-                    )}
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-foreground mb-2">
-                      {form.country === "CA" ? "Postal Code *" : "ZIP Code *"}
-                    </label>
-                    <input
-                      type="text"
-                      value={form.postal_code}
-                      onChange={(e) => updateForm("postal_code", e.target.value)}
-                      className={`input ${errors.postal_code ? "input-error" : ""}`}
-                      placeholder={form.country === "CA" ? "A1A 1A1" : "12345"}
-                      id="checkout-postal_code"
-                      autoComplete="postal-code"
-                      inputMode={form.country === "CA" ? "text" : "numeric"}
-                      required
-                    />
-                    {errors.postal_code && (
-                      <p className="text-xs text-red-600 mt-1">{errors.postal_code}</p>
-                    )}
-                  </div>
-                </div>
+                    {/* City, Province, Postal */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-foreground mb-2">
+                          City
+                        </label>
+                        <input
+                          type="text"
+                          value={form.city}
+                          onChange={(e) => updateForm("city", e.target.value)}
+                          className={`input ${errors.city ? "input-error" : ""}`}
+                          placeholder="Toronto"
+                          id="checkout-city"
+                          autoComplete="address-level2"
+                          required
+                        />
+                        {errors.city && (
+                          <p className="text-xs text-red-600 mt-1">{errors.city}</p>
+                        )}
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-foreground mb-2">
+                          Province/State
+                        </label>
+                        <select
+                          value={form.province_state}
+                          onChange={(e) => updateForm("province_state", e.target.value)}
+                          className={`input ${errors.province_state ? "input-error" : ""}`}
+                          id="checkout-province_state"
+                          autoComplete="address-level1"
+                          required
+                        >
+                          <option value="">Select...</option>
+                          {provinces.map((p) => (
+                            <option key={p.code} value={p.code}>
+                              {p.name}
+                            </option>
+                          ))}
+                        </select>
+                        {errors.province_state && (
+                          <p className="text-xs text-red-600 mt-1">{errors.province_state}</p>
+                        )}
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-foreground mb-2">
+                          {form.country === "CA" ? "Postal Code" : "ZIP Code"}
+                        </label>
+                        <input
+                          type="text"
+                          value={form.postal_code}
+                          onChange={(e) => updateForm("postal_code", e.target.value)}
+                          className={`input ${errors.postal_code ? "input-error" : ""}`}
+                          placeholder={form.country === "CA" ? "A1A 1A1" : "12345"}
+                          id="checkout-postal_code"
+                          autoComplete="postal-code"
+                          inputMode={form.country === "CA" ? "text" : "numeric"}
+                          required
+                        />
+                        {errors.postal_code && (
+                          <p className="text-xs text-red-600 mt-1">{errors.postal_code}</p>
+                        )}
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
 
               {/* Continue to Payment button */}
@@ -849,6 +988,7 @@ export default function CheckoutPage() {
                 )}
               </button>
             </div>
+            </>
           )}
 
           {/* ═══ STEP 2: Payment ═══ */}
@@ -858,10 +998,22 @@ export default function CheckoutPage() {
               <div className="card mb-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h3 className="font-medium text-foreground">Shipping to</h3>
-                    <p className="text-sm text-foreground/60">
-                      {form.first_name} {form.last_name}, {form.address_line1}, {form.city}, {form.province_state} {form.postal_code}
-                    </p>
+                    {fulfillmentMethod === "store_pickup" ? (
+                      <>
+                        <h3 className="font-medium text-foreground">Pick up in store</h3>
+                        <p className="text-sm text-foreground/60">
+                          {form.first_name} {form.last_name}
+                          {storeSettings.pickup_location ? ` — ${storeSettings.pickup_location}` : ""}
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <h3 className="font-medium text-foreground">Shipping to</h3>
+                        <p className="text-sm text-foreground/60">
+                          {form.first_name} {form.last_name}, {form.address_line1}, {form.city}, {form.province_state} {form.postal_code}
+                        </p>
+                      </>
+                    )}
                   </div>
                   <button
                     type="button"
@@ -876,7 +1028,36 @@ export default function CheckoutPage() {
                 </div>
               </div>
 
-              {/* Shipping method selection */}
+              {/* Shipping method selection (shipping orders only — pickup is free) */}
+              {fulfillmentMethod === "store_pickup" ? (
+                <div className="card mb-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="font-medium text-foreground">Pickup</h3>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPaymentError("");
+                        setCheckoutStep("shipping");
+                      }}
+                      className="text-sm text-primary hover:underline font-medium"
+                    >
+                      Change
+                    </button>
+                  </div>
+                  <div className="flex items-center justify-between rounded-lg border border-primary bg-primary/5 px-4 py-3">
+                    <span>
+                      <span className="block text-sm font-medium text-foreground">Pick up in store</span>
+                      <span className="block text-xs text-foreground/50 mt-0.5">
+                        {storeSettings.pickup_location || "Arade store pickup"}
+                        {storeSettings.pickup_preparation_minutes
+                          ? ` — ready in ~${storeSettings.pickup_preparation_minutes} minutes`
+                          : ""}
+                      </span>
+                    </span>
+                    <span className="text-sm font-semibold text-green-600">FREE</span>
+                  </div>
+                </div>
+              ) : (
               <div className="card mb-4">
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="font-medium text-foreground">Shipping Method</h3>
@@ -930,6 +1111,7 @@ export default function CheckoutPage() {
                   ))}
                 </div>
               </div>
+              )}
 
               {/* Payment Method Selection */}
               <div className="card mb-6">
@@ -1135,7 +1317,11 @@ export default function CheckoutPage() {
                 </div>
               )}
               <div className="flex justify-between text-sm">
-                <span className="text-foreground/60">Delivery ({selectedRate?.serviceName || "—"})</span>
+                <span className="text-foreground/60">
+                  {fulfillmentMethod === "store_pickup"
+                    ? "Pickup (in store)"
+                    : `Delivery (${selectedRate?.serviceName || "—"})`}
+                </span>
                 <span
                   className={
                     deliveryFee === 0
@@ -1148,7 +1334,7 @@ export default function CheckoutPage() {
                     : formatPrice(deliveryFee, currency)}
                 </span>
               </div>
-              {!selectedRate && (
+              {fulfillmentMethod === "shipping" && !selectedRate && (
                 <p className="text-xs text-foreground/50">
                   Delivery is calculated from live Canada Post rates for your address.
                 </p>

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Search, Eye, ChevronDown, Loader2 } from "lucide-react";
 
 interface Order {
+  fulfillment_method?: "shipping" | "store_pickup" | null;
   id: string;
   order_number: string;
   total: number;
@@ -109,8 +110,13 @@ export default function AdminOrdersPage() {
                 {filteredOrders.map((order) => (
                   <tr key={order.id} className="border-b border-border last:border-0 hover:bg-muted/30">
                     <td className="p-4">
-                      <Link href={`/admin/orders/${order.id}`} className="font-medium text-primary hover:text-primary-dark">
+                      <Link href={`/admin/orders/${order.id}`} className="font-medium text-primary hover:text-primary-dark inline-flex items-center gap-2">
                         {order.order_number || order.id.slice(0, 8)}
+                        {order.fulfillment_method === "store_pickup" && (
+                          <span className="inline-block px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-primary/10 text-primary">
+                            Pickup
+                          </span>
+                        )}
                       </Link>
                     </td>
                     <td className="p-4">

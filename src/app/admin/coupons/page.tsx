@@ -151,7 +151,7 @@ export default function AdminCouponsPage() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium mb-1">Code *</label>
+              <label className="block text-sm font-medium mb-1">Code</label>
               <input value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase() })}
                 placeholder="e.g. WELCOME10" className="input" />
             </div>
@@ -161,7 +161,7 @@ export default function AdminCouponsPage() {
                 placeholder="e.g. Launch promo" className="input" />
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1">Discount type *</label>
+              <label className="block text-sm font-medium mb-1">Discount type</label>
               <select value={form.discount_type} onChange={(e) => setForm({ ...form, discount_type: e.target.value as "percent" | "fixed" })} className="input">
                 <option value="percent">Percent off (both currencies)</option>
                 <option value="fixed">Fixed amount off</option>
@@ -169,14 +169,14 @@ export default function AdminCouponsPage() {
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">
-                {form.discount_type === "percent" ? "Percent value (0-100) *" : "CAD amount *"}
+                {form.discount_type === "percent" ? "Percent value (0-100)" : "CAD amount"}
               </label>
               <input type="number" step="0.01" min="0" value={form.discount_value_cad}
                 onChange={(e) => setForm({ ...form, discount_value_cad: e.target.value })} className="input" />
             </div>
             {form.discount_type === "fixed" && (
               <div>
-                <label className="block text-sm font-medium mb-1">USD amount *</label>
+                <label className="block text-sm font-medium mb-1">USD amount</label>
                 <input type="number" step="0.01" min="0" value={form.discount_value_usd}
                   onChange={(e) => setForm({ ...form, discount_value_usd: e.target.value })} className="input" />
               </div>

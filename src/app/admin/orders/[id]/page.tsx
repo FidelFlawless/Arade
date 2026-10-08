@@ -2,7 +2,7 @@
 
 import { useState, useEffect, use } from "react";
 import Link from "next/link";
-import { ArrowLeft, Loader2, ChevronDown, Package, Printer } from "lucide-react";
+import { ArrowLeft, Loader2, ChevronDown, Package, Printer, Store, MapPin, Clock } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
 interface OrderDetail {
@@ -28,6 +28,17 @@ interface OrderDetail {
   country: string;
   created_at: string;
   shipping_email: string | null;
+  fulfillment_method?: "shipping" | "store_pickup" | null;
+  pickup_status?: "preparing" | "picking" | "ready" | "picked_up" | "cancelled" | null;
+  pickup_store_name?: string | null;
+  pickup_address_line1?: string | null;
+  pickup_address_line2?: string | null;
+  pickup_city?: string | null;
+  pickup_state_province?: string | null;
+  pickup_postal_code?: string | null;
+  pickup_country?: string | null;
+  pickup_phone?: string | null;
+  pickup_preparation_time?: string | null;
   shipping_method_name: string | null;
   shipping_method_code: string | null;
   tracking_number: string | null;
@@ -53,6 +64,31 @@ const statusColors: Record<string, string> = {
   shipped: "bg-purple-100 text-purple-800",
   delivered: "bg-green-100 text-green-800",
   cancelled: "bg-red-100 text-red-800",
+};
+
+const pickupStatusColors: Record<string, string> = {
+  preparing: "bg-yellow-100 text-yellow-800",
+  picking: "bg-blue-100 text-blue-800",
+  ready: "bg-green-100 text-green-800",
+  picked_up: "bg-emerald-100 text-emerald-800",
+  cancelled: "bg-red-100 text-red-800",
+};
+
+const pickupStatusLabels: Record<string, string> = {
+  preparing: "Preparing",
+  picking: "Picking",
+  ready: "Ready for Pickup",
+  picked_up: "Picked Up",
+  cancelled: "Cancelled",
+};
+
+/** Allowed pickup-status transitions (mirrors the server-side whitelist). */
+const PICKUP_TRANSITIONS: Record<string, string[]> = {
+  preparing: ["picking", "ready", "cancelled"],
+  picking: ["preparing", "ready", "cancelled"],
+  ready: ["picking", "picked_up", "cancelled"],
+  picked_up: [],
+  cancelled: [],
 };
 
 export default function AdminOrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -106,15 +142,48 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
     setUpdating(false);
   }
 
+  async function updatePickupStatus(newStatus: string) {
+    setUpdating(true);
+    setShipmentMessage(null);
+    try {
+      const res = await fetch("/api/admin/orders", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, pickup_status: newStatus }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setShipmentMessage({ type: "error", text: data.error || "Failed to update pickup status" });
+      } else {
+        setOrder((prev) =>
+          prev
+            ? {
+                ...prev,
+                pickup_status: newStatus as OrderDetail["pickup_status"],
+                // The server keeps order_status coherent (picked_up -> delivered).
+                order_status: newStatus === "picked_up" ? "delivered" : newStatus === "cancelled" ? "cancelled" : prev.order_status,
+              }
+            : prev
+        );
+      }
+    } catch {
+      setShipmentMessage({ type: "error", text: "Could not update pickup status. Try again." });
+    } finally {
+      setUpdating(false);
+    }
+  }
+
   async function createShipment() {
     setCreatingShipment(true);
     setShipmentMessage(null);
+    // The tab must be opened synchronously DURING the click - browsers block
+    // window.open calls that happen later (after the await), which is why the
+    // label never opened itself. We navigate the pre-opened tab once the
+    // shipment exists, and close it if creation fails.
+    const labelWindow = window.open("about:blank", "_blank");
     try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const token = sessionData?.session?.access_token;
       const res = await fetch(`/api/admin/orders/${id}/shipment`, {
         method: "POST",
-        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
       });
       const data = await res.json();
       if (res.ok && data.success) {
@@ -130,12 +199,21 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
             : prev
         );
         if (data.labelUrl) {
-          window.open(`/api/admin/orders/${id}/label`, "_blank");
+          if (labelWindow) {
+            labelWindow.location.href = `/api/admin/orders/${id}/label`;
+          } else {
+            setShipmentMessage({
+              type: "success",
+              text: `Shipment created — tracking ${data.trackingNumber}. Open the label with the View Label (PDF) button below.`,
+            });
+          }
         }
       } else {
+        labelWindow?.close();
         setShipmentMessage({ type: "error", text: data.error || "Failed to create shipment" });
       }
     } catch {
+      labelWindow?.close();
       setShipmentMessage({ type: "error", text: "Could not reach the shipment service. Try again." });
     } finally {
       setCreatingShipment(false);
@@ -313,8 +391,80 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
             </div>
           </div>
 
-          {/* Canada Post Shipment */}
+          {/* Fulfillment: Store Pickup or Canada Post Shipment */}
+          {order.fulfillment_method === "store_pickup" ? (
           <div className="card">
+            <div className="flex items-center gap-2 mb-4">
+              <Store className="w-5 h-5 text-primary" />
+              <h2 className="text-lg font-semibold text-foreground">Store Pickup</h2>
+              <span className={`ml-auto inline-block px-2.5 py-1 rounded-full text-xs font-medium ${pickupStatusColors[order.pickup_status || "preparing"] || "bg-gray-100 text-gray-800"}`}>
+                {pickupStatusLabels[order.pickup_status || "preparing"] || order.pickup_status}
+              </span>
+            </div>
+
+            {/* Pickup location */}
+            <div className="space-y-1 text-sm text-foreground/70 mb-4">
+              <p className="flex items-center gap-2">
+                <MapPin className="w-4 h-4 text-foreground/40" />
+                {order.pickup_store_name || "Arade store pickup"}
+              </p>
+              {(order.pickup_address_line1 || order.pickup_address_line2 || order.pickup_city) && (
+                <p className="pl-6">
+                  {[order.pickup_address_line1, order.pickup_address_line2, order.pickup_city, order.pickup_state_province, order.pickup_postal_code]
+                    .filter(Boolean)
+                    .join(", ")}
+                </p>
+              )}
+              {order.pickup_preparation_time && (
+                <p className="flex items-center gap-2">
+                  <Clock className="w-4 h-4 text-foreground/40" />
+                  Preparation time: {order.pickup_preparation_time}
+                </p>
+              )}
+            </div>
+
+            {/* Pickup status actions — manual in-store fulfillment, no Canada Post */}
+            {(order.pickup_status === "picked_up" || order.pickup_status === "cancelled") ? (
+              <p className="text-xs text-foreground/50">
+                This pickup is {order.pickup_status === "picked_up" ? "complete" : "cancelled"} — no further actions.
+              </p>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {(PICKUP_TRANSITIONS[order.pickup_status || "preparing"] || []).map((next) => (
+                  <button
+                    key={next}
+                    type="button"
+                    onClick={() => updatePickupStatus(next)}
+                    disabled={updating || order.payment_status !== "paid"}
+                    className={
+                      next === "picked_up"
+                        ? "btn-primary inline-flex items-center gap-2 px-4 py-2 text-sm disabled:opacity-50"
+                        : next === "cancelled"
+                          ? "inline-flex items-center gap-2 px-4 py-2 text-sm rounded-lg border border-red-200 text-red-600 hover:bg-red-50 disabled:opacity-50"
+                          : "btn-secondary inline-flex items-center gap-2 px-4 py-2 text-sm disabled:opacity-50"
+                    }
+                  >
+                    {updating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Package className="w-4 h-4" />}
+                    {pickupStatusLabels[next] || next}
+                  </button>
+                ))}
+              </div>
+            )}
+            {order.payment_status !== "paid" && (
+              <p className="text-xs text-foreground/50 mt-2">Only paid orders can be progressed.</p>
+            )}
+            {shipmentMessage && (
+              <p className={`mt-2 text-xs ${shipmentMessage.type === "success" ? "text-green-600" : "text-red-600"}`}>
+                {shipmentMessage.text}
+              </p>
+            )}
+            <p className="text-xs text-foreground/40 mt-3">
+              In-store pickup — fulfilled manually. No Canada Post shipment or tracking for this order.
+            </p>
+          </div>
+          ) : (
+          <div className="card">
+            <h2 className="text-lg font-semibold text-foreground mb-4">Canada Post Shipment</h2>
             <h2 className="text-lg font-semibold text-foreground mb-4">Canada Post Shipment</h2>
             {order.shipping_method_name && (
               <p className="text-sm mb-2">
@@ -378,6 +528,7 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
               </p>
             )}
           </div>
+          )}
 
           {/* Payment */}
           <div className="card">

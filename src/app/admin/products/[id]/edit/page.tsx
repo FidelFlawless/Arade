@@ -199,7 +199,7 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
           <h2 className="text-lg font-semibold text-foreground mb-4">Basic Information</h2>
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-foreground mb-2">Product Name *</label>
+              <label className="block text-sm font-medium text-foreground mb-2">Product Name</label>
               <input type="text" value={form.name} onChange={(e) => { const name = e.target.value; setForm((prev) => ({ ...prev, name, slug: name.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') })); }}
                 className={`w-full px-4 py-2.5 border rounded-lg text-sm outline-none ${errors.name ? "border-red-500" : "border-border"}`} />
               {errors.name && <p className="text-xs text-red-600 mt-1">{errors.name}</p>}
@@ -210,7 +210,7 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
                 className="w-full px-4 py-2.5 border border-border rounded-lg text-sm outline-none bg-gray-50" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-foreground mb-2">Description *</label>
+              <label className="block text-sm font-medium text-foreground mb-2">Description</label>
               <textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })}
                 rows={4} className={`w-full px-4 py-2.5 border rounded-lg text-sm outline-none resize-none ${errors.description ? "border-red-500" : "border-border"}`} />
               {errors.description && <p className="text-xs text-red-600 mt-1">{errors.description}</p>}
@@ -228,7 +228,7 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
           <h2 className="text-lg font-semibold text-foreground mb-4">Pricing & Stock</h2>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
-              <label className="block text-sm font-medium text-foreground mb-2">Price (CAD) *</label>
+              <label className="block text-sm font-medium text-foreground mb-2">Price (CAD)</label>
               <input type="number" value={form.price_cad} onChange={(e) => {
                 const cad = e.target.value;
                 setForm((prev) => ({ ...prev, price_cad: cad }));
@@ -242,7 +242,7 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
               {errors.price_cad && <p className="text-xs text-red-600 mt-1">{errors.price_cad}</p>}
             </div>
             <div>
-              <label className="block text-sm font-medium text-foreground mb-2">Price (USD) *</label>
+              <label className="block text-sm font-medium text-foreground mb-2">Price (USD)</label>
               <input type="number" value={form.price_usd} onChange={(e) => {
                 setUsdManuallyEdited(true);
                 setForm({ ...form, price_usd: e.target.value });
@@ -289,7 +289,7 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
 
         {/* Category */}
         <div className="card">
-          <h2 className="text-lg font-semibold text-foreground mb-4">Category *</h2>
+          <h2 className="text-lg font-semibold text-foreground mb-4">Category</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-foreground mb-2">Main Category</label>

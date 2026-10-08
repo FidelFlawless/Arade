@@ -54,15 +54,15 @@ function emailShell(title: string, bodyHtml: string): string {
   <!DOCTYPE html>
   <html>
   <head><meta charset="utf-8"></head>
-  <body style="margin: 0; padding: 0; background-color: #faf8f5; font-family: 'Helvetica Neue', Arial, sans-serif;">
+  <body style="margin: 0; padding: 0; background-color: #FAF7FC; font-family: 'Helvetica Neue', Arial, sans-serif;">
     <div style="max-width: 560px; margin: 0 auto; padding: 40px 20px;">
       <div style="text-align: center; margin-bottom: 32px;">
         <img src="${SITE_URL}/icon.png" alt="Arade" width="72" height="72" style="display: block; margin: 0 auto 12px; border-radius: 16px;" />
-        <h1 style="font-size: 24px; color: #1a1a2e; margin: 0 0 8px; font-weight: 700;">Arade</h1>
-        <p style="color: #8B5E3C; font-size: 13px; letter-spacing: 2px; margin: 0; text-transform: uppercase;">Beauty &middot; Skincare &middot; Hair &middot; Fashion</p>
+        <h1 style="font-size: 24px; color: #402052; margin: 0 0 8px; font-weight: 700;">Arade</h1>
+        <p style="color: #6E3A96; font-size: 13px; letter-spacing: 2px; margin: 0; text-transform: uppercase;">Beauty &middot; Skincare &middot; Hair &middot; Fashion</p>
       </div>
 
-      <div style="background: white; border-radius: 16px; padding: 32px; margin-bottom: 24px; border: 1px solid #f0ece4;">
+      <div style="background: white; border-radius: 16px; padding: 32px; margin-bottom: 24px; border: 1px solid #E4D4F2;">
         ${bodyHtml}
       </div>
 
@@ -93,6 +93,15 @@ interface OrderRow {
   shipping_state_province: string;
   shipping_postal_code: string;
   shipping_country: string;
+  fulfillment_method?: "shipping" | "store_pickup" | null;
+  pickup_status?: string | null;
+  pickup_store_name?: string | null;
+  pickup_address_line1?: string | null;
+  pickup_address_line2?: string | null;
+  pickup_city?: string | null;
+  pickup_state_province?: string | null;
+  pickup_postal_code?: string | null;
+  pickup_preparation_time?: string | null;
 }
 
 interface OrderItemRow {
@@ -161,18 +170,28 @@ export async function sendOrderConfirmationEmail(orderId: string): Promise<boole
       .map(
         (item) => `
         <tr>
-          <td style="padding: 12px 0; border-bottom: 1px solid #f0ece4;">
-            <div style="font-weight: 600; color: #1a1a2e; font-size: 14px;">${esc(item.product_name)}</div>
+          <td style="padding: 12px 0; border-bottom: 1px solid #E4D4F2;">
+            <div style="font-weight: 600; color: #402052; font-size: 14px;">${esc(item.product_name)}</div>
             <div style="color: #666; font-size: 13px; margin-top: 4px;">${money(item.unit_price, o.currency)} &times; ${esc(item.quantity)}</div>
           </td>
-          <td style="padding: 12px 0; border-bottom: 1px solid #f0ece4; text-align: right; font-weight: 600; color: #8B5E3C;">
+          <td style="padding: 12px 0; border-bottom: 1px solid #E4D4F2; text-align: right; font-weight: 600; color: #6E3A96;">
             ${money(item.subtotal, o.currency)}
           </td>
         </tr>`
       )
       .join("");
 
-    const addressHtml = `
+    const isPickup = o.fulfillment_method === "store_pickup";
+
+    const addressHtml = isPickup
+      ? `
+      <p style="margin: 0; color: #333; font-size: 14px; line-height: 1.7;">
+        <strong>${esc(o.pickup_store_name || "Arade store pickup")}</strong>${o.pickup_address_line1 ? `<br />${esc(o.pickup_address_line1)}` : ""}${o.pickup_address_line2 ? `<br />${esc(o.pickup_address_line2)}` : ""}${o.pickup_city ? `<br />${esc([o.pickup_city, o.pickup_state_province, o.pickup_postal_code].filter(Boolean).join(", "))}` : ""}
+      </p>
+      <p style="margin: 8px 0 0; color: #6E3A96; font-size: 13px; line-height: 1.6;">
+        ${o.pickup_preparation_time ? `Estimated preparation time: ${esc(o.pickup_preparation_time)}. ` : ""}We'll email you again when your order is ready for pickup — just bring your order number.
+      </p>`
+      : `
       <p style="margin: 0; color: #333; font-size: 14px; line-height: 1.7;">
         ${esc(o.shipping_first_name)} ${esc(o.shipping_last_name)}<br />
         ${esc(o.shipping_address_line1)}${o.shipping_address_line2 ? `<br />${esc(o.shipping_address_line2)}` : ""}<br />
@@ -191,20 +210,22 @@ export async function sendOrderConfirmationEmail(orderId: string): Promise<boole
     const htmlContent = emailShell(
       "Order confirmation",
       `
-      <h2 style="font-size: 20px; color: #1a1a2e; margin: 0 0 8px;">Thank you for your order, ${firstName}!</h2>
+      <h2 style="font-size: 20px; color: #402052; margin: 0 0 8px;">Thank you for your order, ${firstName}!</h2>
       <p style="color: #666; font-size: 14px; margin: 0 0 24px; line-height: 1.6;">
-        Your payment has been confirmed and we're getting your order ready.
+        ${isPickup
+          ? "Your payment has been confirmed. We're getting your order ready for pickup at the store — no shipping fee."
+          : "Your payment has been confirmed and we're getting your order ready."}
       </p>
 
-      <table style="width: 100%; border-collapse: collapse; background: #faf8f5; border-radius: 10px; margin-bottom: 24px;">
+      <table style="width: 100%; border-collapse: collapse; background: #FAF7FC; border-radius: 10px; margin-bottom: 24px;">
         <tr>
           <td style="padding: 14px 18px;">
             <p style="margin: 0; color: #999; font-size: 12px; text-transform: uppercase; letter-spacing: 1px;">Order number</p>
-            <p style="margin: 4px 0 0; font-weight: 700; color: #1a1a2e; font-size: 15px;">${esc(o.order_number)}</p>
+            <p style="margin: 4px 0 0; font-weight: 700; color: #402052; font-size: 15px;">${esc(o.order_number)}</p>
           </td>
           <td style="padding: 14px 18px; text-align: right; vertical-align: top;">
             <p style="margin: 0; color: #999; font-size: 12px; text-transform: uppercase; letter-spacing: 1px;">Date</p>
-            <p style="margin: 4px 0 0; font-weight: 600; color: #1a1a2e; font-size: 14px;">${esc(formatDate(o.created_at))}</p>
+            <p style="margin: 4px 0 0; font-weight: 600; color: #402052; font-size: 14px;">${esc(formatDate(o.created_at))}</p>
           </td>
         </tr>
       </table>
@@ -215,27 +236,27 @@ export async function sendOrderConfirmationEmail(orderId: string): Promise<boole
 
       <table style="width: 100%; border-collapse: collapse; margin-top: 20px;">
         <tr>
-          <td style="padding: 16px 0 6px; border-top: 2px solid #f0ece4; color: #666; font-size: 14px;">Subtotal</td>
-          <td style="padding: 16px 0 6px; border-top: 2px solid #f0ece4; color: #666; font-size: 14px; text-align: right;">${money(o.subtotal, o.currency)}</td>
+          <td style="padding: 16px 0 6px; border-top: 2px solid #E4D4F2; color: #666; font-size: 14px;">Subtotal</td>
+          <td style="padding: 16px 0 6px; border-top: 2px solid #E4D4F2; color: #666; font-size: 14px; text-align: right;">${money(o.subtotal, o.currency)}</td>
         </tr>
         ${discountRow}
         <tr>
-          <td style="padding: 6px 0; color: #666; font-size: 14px;">Delivery</td>
-          <td style="padding: 6px 0; color: #666; font-size: 14px; text-align: right;">${money(o.delivery_fee, o.currency)}</td>
+          <td style="padding: 6px 0; color: #666; font-size: 14px;">${isPickup ? "Pickup (in store)" : "Delivery"}</td>
+          <td style="padding: 6px 0; color: #666; font-size: 14px; text-align: right;">${isPickup ? "FREE" : money(o.delivery_fee, o.currency)}</td>
         </tr>
         <tr>
-          <td style="padding: 12px 0 0; border-top: 1px solid #f0ece4; font-weight: 700; color: #1a1a2e; font-size: 16px;">Total</td>
-          <td style="padding: 12px 0 0; border-top: 1px solid #f0ece4; font-weight: 700; color: #8B5E3C; font-size: 16px; text-align: right;">${money(o.total, o.currency)}</td>
+          <td style="padding: 12px 0 0; border-top: 1px solid #E4D4F2; font-weight: 700; color: #402052; font-size: 16px;">Total</td>
+          <td style="padding: 12px 0 0; border-top: 1px solid #E4D4F2; font-weight: 700; color: #6E3A96; font-size: 16px; text-align: right;">${money(o.total, o.currency)}</td>
         </tr>
       </table>
 
       <div style="margin-top: 24px;">
-        <p style="margin: 0 0 8px; font-weight: 700; color: #1a1a2e; font-size: 14px;">Shipping to</p>
+        <p style="margin: 0 0 8px; font-weight: 700; color: #402052; font-size: 14px;">${isPickup ? "Pickup at" : "Shipping to"}</p>
         ${addressHtml}
       </div>
 
       <div style="text-align: center; margin-top: 28px;">
-        <a href="${SITE_URL}/order/${esc(o.order_number)}" style="display: inline-block; background-color: #8B5E3C; color: white; padding: 14px 40px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 15px;">View Order Details</a>
+        <a href="${SITE_URL}/order/${esc(o.order_number)}" style="display: inline-block; background-color: #A05AD0; color: white; padding: 14px 40px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 15px;">View Order Details</a>
       </div>
       <p style="text-align: center; color: #999; font-size: 12px; margin-top: 12px;">
         You can also track this order anytime from your account.
@@ -270,35 +291,37 @@ export async function sendOrderConfirmationEmail(orderId: string): Promise<boole
       const ownerHtml = emailShell(
         "New order received",
         `
-        <h2 style="font-size: 20px; color: #1a1a2e; margin: 0 0 8px;">New order received</h2>
+        <h2 style="font-size: 20px; color: #402052; margin: 0 0 8px;">New order received</h2>
         <p style="color: #666; font-size: 14px; margin: 0 0 24px; line-height: 1.6;">
-          A customer has completed payment for a new Arade order.
+          ${isPickup
+            ? "A customer has completed payment for a new Arade <strong>store pickup</strong> order — prepare it for in-store collection."
+            : "A customer has completed payment for a new Arade order."}
         </p>
-        <table style="width: 100%; border-collapse: collapse; background: #faf8f5; border-radius: 10px; margin-bottom: 24px;">
+        <table style="width: 100%; border-collapse: collapse; background: #FAF7FC; border-radius: 10px; margin-bottom: 24px;">
           <tr>
             <td style="padding: 14px 18px;">
               <p style="margin: 0; color: #999; font-size: 12px; text-transform: uppercase; letter-spacing: 1px;">Order number</p>
-              <p style="margin: 4px 0 0; font-weight: 700; color: #1a1a2e; font-size: 15px;">${esc(o.order_number)}</p>
+              <p style="margin: 4px 0 0; font-weight: 700; color: #402052; font-size: 15px;">${esc(o.order_number)}</p>
             </td>
             <td style="padding: 14px 18px; text-align: right; vertical-align: top;">
               <p style="margin: 0; color: #999; font-size: 12px; text-transform: uppercase; letter-spacing: 1px;">Total</p>
-              <p style="margin: 4px 0 0; font-weight: 700; color: #8B5E3C; font-size: 15px;">${money(o.total, o.currency)}</p>
+              <p style="margin: 4px 0 0; font-weight: 700; color: #6E3A96; font-size: 15px;">${money(o.total, o.currency)}</p>
             </td>
           </tr>
         </table>
-        <p style="margin: 0 0 8px; font-weight: 700; color: #1a1a2e; font-size: 14px;">Customer</p>
+        <p style="margin: 0 0 8px; font-weight: 700; color: #402052; font-size: 14px;">Customer</p>
         <p style="margin: 0 0 20px; color: #333; font-size: 14px; line-height: 1.7;">
           ${esc(o.shipping_first_name)} ${esc(o.shipping_last_name)}<br />
           ${esc(recipient)}
         </p>
-        <p style="margin: 0 0 8px; font-weight: 700; color: #1a1a2e; font-size: 14px;">Items</p>
+        <p style="margin: 0 0 8px; font-weight: 700; color: #402052; font-size: 14px;">Items</p>
         <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
           ${itemRows}
         </table>
-        <p style="margin: 0 0 8px; font-weight: 700; color: #1a1a2e; font-size: 14px;">Ship to</p>
+        <p style="margin: 0 0 8px; font-weight: 700; color: #402052; font-size: 14px;">${isPickup ? "Pickup at" : "Ship to"}</p>
         ${addressHtml}
         <div style="text-align: center; margin-top: 28px;">
-          <a href="${SITE_URL}/admin/orders" style="display: inline-block; background-color: #8B5E3C; color: white; padding: 14px 40px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 15px;">Open Admin Orders</a>
+          <a href="${SITE_URL}/admin/orders" style="display: inline-block; background-color: #A05AD0; color: white; padding: 14px 40px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 15px;">Open Admin Orders</a>
         </div>`
       );
 
@@ -365,20 +388,20 @@ export async function sendWelcomeEmail(recipientEmail: string, firstName: string
     const htmlContent = emailShell(
       "Welcome to Arade",
       `
-      <h2 style="font-size: 20px; color: #1a1a2e; margin: 0 0 8px;">Welcome, ${esc(firstName || "there")}!</h2>
+      <h2 style="font-size: 20px; color: #402052; margin: 0 0 8px;">Welcome, ${esc(firstName || "there")}!</h2>
       <p style="color: #666; font-size: 14px; margin: 0 0 24px; line-height: 1.6;">
         Thanks for creating an account with Arade. As a welcome gift, here's
-        <strong style="color: #8B5E3C;">${esc(discountLabel)}</strong> your first order.
+        <strong style="color: #6E3A96;">${esc(discountLabel)}</strong> your first order.
       </p>
 
-      <div style="background: #faf8f5; border: 2px dashed #8B5E3C; border-radius: 10px; padding: 20px; text-align: center; margin-bottom: 24px;">
+      <div style="background: #FAF7FC; border: 2px dashed #6E3A96; border-radius: 10px; padding: 20px; text-align: center; margin-bottom: 24px;">
         <p style="margin: 0 0 6px; color: #999; font-size: 12px; text-transform: uppercase; letter-spacing: 1px;">Your welcome code</p>
-        <p style="margin: 0; font-weight: 700; color: #8B5E3C; font-size: 26px; letter-spacing: 3px;">${esc(coupon.code)}</p>
+        <p style="margin: 0; font-weight: 700; color: #6E3A96; font-size: 26px; letter-spacing: 3px;">${esc(coupon.code)}</p>
         <p style="margin: 8px 0 0; color: #666; font-size: 12px;">Valid for 30 days, on your first order only.</p>
       </div>
 
       <div style="text-align: center;">
-        <a href="${SITE_URL}/shop" style="display: inline-block; background-color: #8B5E3C; color: white; padding: 14px 40px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 15px;">Start Shopping</a>
+        <a href="${SITE_URL}/shop" style="display: inline-block; background-color: #A05AD0; color: white; padding: 14px 40px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 15px;">Start Shopping</a>
       </div>
       <p style="text-align: center; color: #999; font-size: 12px; margin-top: 12px;">
         Just sign in at checkout and the discount is applied automatically.
@@ -461,23 +484,23 @@ export async function sendShippedEmail(orderId: string, trackingPin: string): Pr
     const htmlContent = emailShell(
       "Your order has shipped",
       `
-      <h2 style="font-size: 20px; color: #1a1a2e; margin: 0 0 8px;">Good news, ${firstName} — your order is on its way!</h2>
+      <h2 style="font-size: 20px; color: #402052; margin: 0 0 8px;">Good news, ${firstName} — your order is on its way!</h2>
       <p style="color: #666; font-size: 14px; margin: 0 0 24px; line-height: 1.6;">
         Order <strong>${esc(o.order_number)}</strong> has been handed to Canada Post${
           o.shipping_method_name ? ` via <strong>${esc(o.shipping_method_name)}</strong>` : ""
         }.
       </p>
 
-      <div style="background: #faf8f5; border-radius: 10px; padding: 20px; text-align: center; margin-bottom: 24px;">
+      <div style="background: #FAF7FC; border-radius: 10px; padding: 20px; text-align: center; margin-bottom: 24px;">
         <p style="margin: 0 0 6px; color: #999; font-size: 12px; text-transform: uppercase; letter-spacing: 1px;">Canada Post tracking number</p>
-        <p style="margin: 0; font-weight: 700; color: #1a1a2e; font-size: 22px; letter-spacing: 1px;">${esc(trackingPin)}</p>
+        <p style="margin: 0; font-weight: 700; color: #402052; font-size: 22px; letter-spacing: 1px;">${esc(trackingPin)}</p>
       </div>
 
       <div style="text-align: center; margin-bottom: 16px;">
-        <a href="${cpUrl}" style="display: inline-block; background-color: #8B5E3C; color: white; padding: 14px 40px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 15px;">Track at Canada Post</a>
+        <a href="${cpUrl}" style="display: inline-block; background-color: #A05AD0; color: white; padding: 14px 40px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 15px;">Track at Canada Post</a>
       </div>
       <p style="text-align: center; margin-bottom: 24px;">
-        <a href="${trackUrl}" style="color: #8B5E3C; font-size: 14px;">or follow it on your Arade order page</a>
+        <a href="${trackUrl}" style="color: #6E3A96; font-size: 14px;">or follow it on your Arade order page</a>
       </p>
 
       <p style="color: #999; font-size: 12px; line-height: 1.6;">

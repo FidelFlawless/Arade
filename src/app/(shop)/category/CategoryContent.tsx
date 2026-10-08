@@ -59,7 +59,7 @@ export default function CategoryContent({
   return (
     <div className="min-h-screen">
       {/* Category Hero */}
-      <section className="bg-[#f5f0ea] py-12 lg:py-16">
+      <section className="bg-[#F3EAFB] py-12 lg:py-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <BackButton href="/shop" label="Back to shop" />
           <span className="text-sm font-medium tracking-widest text-primary uppercase">

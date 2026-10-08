@@ -74,7 +74,7 @@ export default function CollectionContent({
   return (
     <div>
       {/* Hero */}
-      <section className="relative bg-[#d5c4a8] overflow-hidden">
+      <section className="relative bg-[#E0D0F0] overflow-hidden">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 lg:py-24">
           <div className="grid grid-cols-1 lg:grid-cols-[4fr_6fr] gap-8 items-center min-h-87.5 lg:min-h-112.5">
             <div className="py-8 lg:py-0 z-10">

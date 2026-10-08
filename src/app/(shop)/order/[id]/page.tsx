@@ -7,7 +7,7 @@ import { useAuth } from "@/components/providers/AuthProvider";
 import { createClient } from "@/lib/supabase/client";
 import ReviewForm from "@/components/reviews/ReviewForm";
 import LiveTracking from "@/components/orders/LiveTracking";
-import { CheckCircle, Package, Truck, ArrowRight, Loader2 } from "lucide-react";
+import { CheckCircle, Package, Truck, ArrowRight, Loader2, Store, MapPin, Clock } from "lucide-react";
 
 interface OrderItem {
   id: string;
@@ -44,8 +44,46 @@ interface Order {
   shipping_country: string;
   tracking_number: string | null;
   shipping_method_name: string | null;
+  fulfillment_method?: "shipping" | "store_pickup" | null;
+  pickup_status?: "preparing" | "picking" | "ready" | "picked_up" | "cancelled" | null;
+  pickup_store_name?: string | null;
+  pickup_address_line1?: string | null;
+  pickup_address_line2?: string | null;
+  pickup_city?: string | null;
+  pickup_state_province?: string | null;
+  pickup_postal_code?: string | null;
+  pickup_country?: string | null;
+  pickup_preparation_time?: string | null;
   order_items: OrderItem[];
 }
+
+const pickupStatusCopy: Record<string, { label: string; message: string; badge: string }> = {
+  preparing: {
+    label: "Preparing",
+    message: "We're preparing your order. We'll email you as soon as it's ready for pickup.",
+    badge: "bg-yellow-100 text-yellow-800",
+  },
+  picking: {
+    label: "Picking",
+    message: "Your order is being picked and packed right now.",
+    badge: "bg-blue-100 text-blue-800",
+  },
+  ready: {
+    label: "Ready for Pickup",
+    message: "Great news — your order is ready! Come by the store with your order number to collect it.",
+    badge: "bg-green-100 text-green-800",
+  },
+  picked_up: {
+    label: "Picked Up",
+    message: "This order has been picked up. Thanks for shopping with Arade!",
+    badge: "bg-emerald-100 text-emerald-800",
+  },
+  cancelled: {
+    label: "Cancelled",
+    message: "This pickup was cancelled. Contact us if you have any questions.",
+    badge: "bg-red-100 text-red-800",
+  },
+};
 
 export default function OrderDetailPage() {
   const params = useParams();
@@ -144,27 +182,73 @@ export default function OrderDetailPage() {
         </div>
       </div>
 
-      <LiveTracking
-        orderNumber={order.order_number}
-        trackingNumber={order.tracking_number}
-      />
-
-      <div className="card mb-6">
-        <div className="flex items-center gap-3 mb-4"><Truck className="w-5 h-5 text-primary" /><h2 className="font-semibold">Shipping Address</h2></div>
-        <p className="text-foreground/70">{order.shipping_first_name} {order.shipping_last_name}</p>
-        <p className="text-foreground/70">{order.shipping_address_line1}{order.shipping_address_line2 && <>, {order.shipping_address_line2}</>}</p>
-        <p className="text-foreground/70">{order.shipping_city}, {order.shipping_state_province || order.shipping_province_state} {order.shipping_postal_code}</p>
-        <p className="text-foreground/70">{order.shipping_country === "CA" ? "Canada" : "United States"}</p>
-        {order.shipping_method_name && (
-          <p className="text-foreground/70 mt-2">Shipping method: {order.shipping_method_name}</p>
-        )}
-        {order.tracking_number && (
-          <div className="mt-4 pt-4 border-t border-border">
-            <p className="text-sm text-foreground/60 mb-2">Tracking number</p>
-            <p className="font-mono font-medium">{order.tracking_number}</p>
+      {order.fulfillment_method === "store_pickup" ? (
+        /* Store Pickup display (order detail only — the list shows a small badge) */
+        <div className="card mb-6">
+          <div className="flex items-center gap-3 mb-4">
+            <Store className="w-5 h-5 text-primary" />
+            <h2 className="font-semibold">Store Pickup</h2>
+            <span
+              className={`ml-auto inline-block px-2.5 py-1 rounded-full text-xs font-medium ${
+                (pickupStatusCopy[order.pickup_status || "preparing"] || pickupStatusCopy.preparing).badge
+              }`}
+            >
+              {(pickupStatusCopy[order.pickup_status || "preparing"] || pickupStatusCopy.preparing).label}
+            </span>
           </div>
-        )}
-      </div>
+
+          <p className="text-sm text-foreground/70 mb-4">
+            {(pickupStatusCopy[order.pickup_status || "preparing"] || pickupStatusCopy.preparing).message}
+          </p>
+
+          <div className="space-y-1 text-sm text-foreground/70">
+            <p className="flex items-center gap-2">
+              <MapPin className="w-4 h-4 text-foreground/40" />
+              Pickup location: {order.pickup_store_name || "Arade store pickup"}
+            </p>
+            {(order.pickup_address_line1 || order.pickup_address_line2 || order.pickup_city) && (
+              <p className="pl-6">
+                {[order.pickup_address_line1, order.pickup_address_line2, order.pickup_city, order.pickup_state_province, order.pickup_postal_code]
+                  .filter(Boolean)
+                  .join(", ")}
+              </p>
+            )}
+            {order.pickup_preparation_time && (
+              <p className="flex items-center gap-2">
+                <Clock className="w-4 h-4 text-foreground/40" />
+                Preparation time: {order.pickup_preparation_time}
+              </p>
+            )}
+          </div>
+          <p className="text-xs text-foreground/40 mt-4">
+            No Canada Post tracking — this order is collected in store.
+          </p>
+        </div>
+      ) : (
+        <>
+          <LiveTracking
+            orderNumber={order.order_number}
+            trackingNumber={order.tracking_number}
+          />
+
+          <div className="card mb-6">
+            <div className="flex items-center gap-3 mb-4"><Truck className="w-5 h-5 text-primary" /><h2 className="font-semibold">Shipping Address</h2></div>
+            <p className="text-foreground/70">{order.shipping_first_name} {order.shipping_last_name}</p>
+            <p className="text-foreground/70">{order.shipping_address_line1}{order.shipping_address_line2 && <>, {order.shipping_address_line2}</>}</p>
+            <p className="text-foreground/70">{order.shipping_city}, {order.shipping_state_province || order.shipping_province_state} {order.shipping_postal_code}</p>
+            <p className="text-foreground/70">{order.shipping_country === "CA" ? "Canada" : "United States"}</p>
+            {order.shipping_method_name && (
+              <p className="text-foreground/70 mt-2">Shipping method: {order.shipping_method_name}</p>
+            )}
+            {order.tracking_number && (
+              <div className="mt-4 pt-4 border-t border-border">
+                <p className="text-sm text-foreground/60 mb-2">Tracking number</p>
+                <p className="font-mono font-medium">{order.tracking_number}</p>
+              </div>
+            )}
+          </div>
+        </>
+      )}
 
       <div className="card mb-6">
         <h2 className="font-semibold mb-4">Order Items</h2>

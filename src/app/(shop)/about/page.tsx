@@ -49,7 +49,7 @@ export default function AboutPage() {
             </p>
           </div>
         </div>
-        <div className="rounded-2xl overflow-hidden bg-[#d5c4a8]/40">
+        <div className="rounded-2xl overflow-hidden bg-[#E0D0F0]/40">
           <img src="/image.webp" alt="Arade Beauty Products" width={1536} height={1024} loading="lazy" decoding="async" className="w-full h-auto object-cover" />
         </div>
       </div>
@@ -103,7 +103,7 @@ export default function AboutPage() {
             { name: "Hair", desc: "Wigs, hair care and accessories." },
             { name: "Fashion", desc: "Dresses, tops and fashion accessories." },
           ].map((cat) => (
-            <div key={cat.name} className="bg-[#f5f0ea] rounded-xl p-6 text-center">
+            <div key={cat.name} className="bg-[#F3EAFB] rounded-xl p-6 text-center">
               <h3 className="font-serif text-lg text-foreground mb-2">{cat.name}</h3>
               <p className="text-sm text-foreground/60">{cat.desc}</p>
             </div>
@@ -112,7 +112,7 @@ export default function AboutPage() {
       </div>
 
       {/* CTA */}
-      <div className="text-center bg-[#f5f0ea] rounded-2xl p-12">
+      <div className="text-center bg-[#F3EAFB] rounded-2xl p-12">
         <h2 className="text-2xl font-serif text-foreground mb-4">
           Ready to Explore?
         </h2>

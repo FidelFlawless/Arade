@@ -10,6 +10,7 @@ import ProductImageGallery from "@/components/product/ProductImageGallery";
 import BackButton from "@/components/ui/BackButton";
 import ProductReviewsSection, { type ProductReviewRow } from "@/components/product/ProductReviewsSection";
 import { absoluteUrl, DEFAULT_OG_IMAGE, JsonLd } from "@/lib/seo";
+import { DELIVERY_FEE_CAD, DELIVERY_FEE_USD } from "@/lib/constants";
 
 /** Collapse whitespace and trim; returns "" for null/undefined values. */
 function cleanText(value: string | null | undefined) {
@@ -166,6 +167,41 @@ export default async function ProductPage({
   const jsonLdDescription =
     cleanText(product.description) ||
     `${brandName ? `${brandName} ` : ""}${product.name}, available at Arade.`;
+  // Return policy for each offer - mirrors the published policy on /returns
+  // (14 days, new items only, in-store or by mail, customer pays return
+  // shipping and creates the label, full refund). Search Console reports
+  // "Missing field hasMerchantReturnPolicy (in offers)" because these live on
+  // the Offer node, not the Product node.
+  const offerReturnPolicy = (applicableCountry: string): Record<string, unknown> => ({
+    "@type": "MerchantReturnPolicy",
+    applicableCountry,
+    returnPolicyCategory: "https://schema.org/MerchantReturnFiniteReturnWindow",
+    merchantReturnDays: 14,
+    itemCondition: "https://schema.org/NewCondition",
+    returnMethod: ["https://schema.org/ReturnInStore", "https://schema.org/ReturnByMail"],
+    returnFees: "https://schema.org/ReturnFeesCustomerResponsibility",
+    returnLabelSource: "https://schema.org/ReturnLabelCustomerResponsibility",
+    refundType: "https://schema.org/FullRefund",
+  });
+
+  // Shipping details per offer - mirrors /shipping: Canada + United States,
+  // delivery fee is the checkout fee for that country/currency (free at
+  // C$180+, which structured data can't express as a threshold), 5-10 business
+  // days in transit after processing.
+  const offerShippingDetails = (
+    addressCountry: string,
+    rate: number,
+    currency: "CAD" | "USD"
+  ): Record<string, unknown> => ({
+    "@type": "OfferShippingDetails",
+    shippingRate: { "@type": "MonetaryAmount", value: rate, currency },
+    shippingDestination: { "@type": "DefinedRegion", addressCountry },
+    deliveryTime: {
+      "@type": "ShippingDeliveryTime",
+      transitTime: { "@type": "QuantitativeValue", minValue: 5, maxValue: 10, unitCode: "DAY" },
+    },
+  });
+
   const productSchema: Record<string, unknown> = {
     "@context": "https://schema.org",
     "@type": "Product",
@@ -182,6 +218,8 @@ export default async function ProductPage({
         price: product.price_cad,
         availability: product.stock_quantity > 0 ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
         itemCondition: "https://schema.org/NewCondition",
+        hasMerchantReturnPolicy: offerReturnPolicy("CA"),
+        shippingDetails: offerShippingDetails("CA", DELIVERY_FEE_CAD, "CAD"),
       },
       {
         "@type": "Offer",
@@ -190,6 +228,8 @@ export default async function ProductPage({
         price: product.price_usd,
         availability: product.stock_quantity > 0 ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
         itemCondition: "https://schema.org/NewCondition",
+        hasMerchantReturnPolicy: offerReturnPolicy("US"),
+        shippingDetails: offerShippingDetails("US", DELIVERY_FEE_USD, "USD"),
       },
     ],
   };
