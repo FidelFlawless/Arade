@@ -54,12 +54,16 @@ declare global {
 const PAYPAL_CLIENT_ID = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID || "";
 
 export default function CheckoutPage() {
-  const [checkoutStep, setCheckoutStep] = useState<"delivery" | "shipping" | "payment">("delivery");
+  // Two steps only: 1 Shipping (delivery method + its detail form) → 2 Payment.
+  const [checkoutStep, setCheckoutStep] = useState<"shipping" | "payment">("shipping");
   // Mobile: order summary lives in a collapsed drawer; the Total stays
   // visible in the step header above it at all times.
   const [summaryOpen, setSummaryOpen] = useState(false);
   // Delivery method: Canada Post shipping (default) or free in-store pickup.
   const [fulfillmentMethod, setFulfillmentMethod] = useState<"shipping" | "store_pickup">("shipping");
+  // The detail form (shipping address or pickup contact) stays tucked away
+  // until a delivery method is picked and the shopper asks to enter details.
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const [form, setForm] = useState<ShippingForm>({
     first_name: "",
     last_name: "",
@@ -665,20 +669,15 @@ export default function CheckoutPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Shipping form + Payment */}
         <div className="lg:col-span-2">
-          {/* Step indicator — Total stays visible in the header at all times */}
+          {/* Step indicator — the running Total stays pinned in this header at all times */}
           <div className="flex flex-wrap items-center gap-x-3 gap-y-2 mb-6">
-            <div className={`flex items-center gap-2 ${checkoutStep === "delivery" ? "text-primary font-semibold" : "text-foreground/50"}`}>
-              <span className={`w-7 h-7 rounded-full flex items-center justify-center text-sm ${checkoutStep === "delivery" ? "bg-primary text-white" : "bg-primary/10 text-primary"}`}>1</span>
-              <span className="text-xs sm:text-sm">Delivery</span>
-            </div>
-            <div className="flex-1 min-w-4 h-px bg-border" />
             <div className={`flex items-center gap-2 ${checkoutStep === "shipping" ? "text-primary font-semibold" : "text-foreground/50"}`}>
-              <span className={`w-7 h-7 rounded-full flex items-center justify-center text-sm ${checkoutStep === "shipping" ? "bg-primary text-white" : checkoutStep === "payment" ? "bg-primary/10 text-primary" : "bg-border text-foreground/40"}`}>2</span>
+              <span className={`w-7 h-7 rounded-full flex items-center justify-center text-sm ${checkoutStep === "shipping" ? "bg-primary text-white" : "bg-primary/10 text-primary"}`}>1</span>
               <span className="text-xs sm:text-sm">Shipping</span>
             </div>
             <div className="flex-1 min-w-4 h-px bg-border" />
             <div className={`flex items-center gap-2 ${checkoutStep === "payment" ? "text-primary font-semibold" : "text-foreground/50"}`}>
-              <span className={`w-7 h-7 rounded-full flex items-center justify-center text-sm ${checkoutStep === "payment" ? "bg-primary text-white" : "bg-border text-foreground/40"}`}>3</span>
+              <span className={`w-7 h-7 rounded-full flex items-center justify-center text-sm ${checkoutStep === "payment" ? "bg-primary text-white" : "bg-border text-foreground/40"}`}>2</span>
               <span className="text-xs sm:text-sm">Payment</span>
             </div>
             <div className="ml-auto flex items-baseline gap-1.5 border-l border-border pl-3">
@@ -687,10 +686,12 @@ export default function CheckoutPage() {
             </div>
           </div>
 
-          {/* ═══ STEP 1: Delivery Method ═══ */}
-          {checkoutStep === "delivery" && (
+          {/* ═══ STEP 1: Shipping — Card 1 chooses the delivery method ═══
+              Once the shopper enters their details, the method picker collapses
+              away (the form's "← Change delivery method" link brings it back). */}
+          {checkoutStep === "shipping" && !detailsOpen && (
             <>
-            {/* Delivery Method */}
+            {/* Card 1 — Delivery Method */}
             <div className="card mb-4">
               <h2 className="text-lg font-semibold text-foreground mb-4">
                 Delivery Method
@@ -771,28 +772,33 @@ export default function CheckoutPage() {
             <button
               type="button"
               onClick={() => {
-                setCheckoutStep("shipping");
-                window.scrollTo({ top: 0, behavior: "smooth" });
+                setPaymentError("");
+                setDetailsOpen(true);
+                requestAnimationFrame(() => {
+                  document
+                    .getElementById("checkout-details")
+                    ?.scrollIntoView({ behavior: "smooth", block: "start" });
+                });
               }}
               className="btn-primary w-full"
             >
-              Continue to {fulfillmentMethod === "store_pickup" ? "Contact Details" : "Shipping Information"}
+              Enter {fulfillmentMethod === "store_pickup" ? "pickup details" : "shipping details"}
             </button>
             </>
           )}
 
-          {/* ═══ STEP 2: Shipping Information ═══ */}
-          {checkoutStep === "shipping" && (
+          {/* ═══ STEP 1 (cont.): Shipping / Contact Information form ═══ */}
+          {checkoutStep === "shipping" && detailsOpen && (
             <>
             <button
               type="button"
-              onClick={() => setCheckoutStep("delivery")}
+              onClick={() => setDetailsOpen(false)}
               className="text-sm text-primary hover:underline font-medium mb-3"
             >
               ← Change delivery method
             </button>
 
-            <div className="card mb-6">
+            <div id="checkout-details" className="card mb-6 scroll-mt-24">
               <h2 className="text-lg font-semibold text-foreground mb-6">
                 {fulfillmentMethod === "store_pickup" ? "Contact Information" : "Shipping Information"}
               </h2>
@@ -1073,7 +1079,7 @@ export default function CheckoutPage() {
                     type="button"
                     onClick={() => {
                       setPaymentError("");
-                      setCheckoutStep("delivery");
+                      setCheckoutStep("shipping");
                     }}
                     className="text-sm text-primary hover:underline font-medium"
                   >
