@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Lock, Loader2, CreditCard, ShoppingBag, RefreshCw } from "lucide-react";
+import { Lock, Loader2, CreditCard, ShoppingBag, RefreshCw, ChevronDown } from "lucide-react";
 import BackButton from "@/components/ui/BackButton";
 import { useCart } from "@/components/providers/CartProvider";
 import { useAuth } from "@/components/providers/AuthProvider";
@@ -54,7 +54,10 @@ declare global {
 const PAYPAL_CLIENT_ID = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID || "";
 
 export default function CheckoutPage() {
-  const [checkoutStep, setCheckoutStep] = useState<"shipping" | "payment">("shipping");
+  const [checkoutStep, setCheckoutStep] = useState<"delivery" | "shipping" | "payment">("delivery");
+  // Mobile: order summary lives in a collapsed drawer; the Total stays
+  // visible in the step header above it at all times.
+  const [summaryOpen, setSummaryOpen] = useState(false);
   // Delivery method: Canada Post shipping (default) or free in-store pickup.
   const [fulfillmentMethod, setFulfillmentMethod] = useState<"shipping" | "store_pickup">("shipping");
   const [form, setForm] = useState<ShippingForm>({
@@ -662,21 +665,30 @@ export default function CheckoutPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Shipping form + Payment */}
         <div className="lg:col-span-2">
-          {/* Step indicator */}
-          <div className="flex items-center gap-3 mb-6">
-            <div className={`flex items-center gap-2 ${checkoutStep === "shipping" ? "text-primary font-semibold" : "text-foreground/50"}`}>
-              <span className={`w-7 h-7 rounded-full flex items-center justify-center text-sm ${checkoutStep === "shipping" ? "bg-primary text-white" : "bg-primary/10 text-primary"}`}>1</span>
-              <span className="text-sm">Shipping</span>
+          {/* Step indicator — Total stays visible in the header at all times */}
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2 mb-6">
+            <div className={`flex items-center gap-2 ${checkoutStep === "delivery" ? "text-primary font-semibold" : "text-foreground/50"}`}>
+              <span className={`w-7 h-7 rounded-full flex items-center justify-center text-sm ${checkoutStep === "delivery" ? "bg-primary text-white" : "bg-primary/10 text-primary"}`}>1</span>
+              <span className="text-xs sm:text-sm">Delivery</span>
             </div>
-            <div className="flex-1 h-px bg-border" />
+            <div className="flex-1 min-w-4 h-px bg-border" />
+            <div className={`flex items-center gap-2 ${checkoutStep === "shipping" ? "text-primary font-semibold" : "text-foreground/50"}`}>
+              <span className={`w-7 h-7 rounded-full flex items-center justify-center text-sm ${checkoutStep === "shipping" ? "bg-primary text-white" : checkoutStep === "payment" ? "bg-primary/10 text-primary" : "bg-border text-foreground/40"}`}>2</span>
+              <span className="text-xs sm:text-sm">Shipping</span>
+            </div>
+            <div className="flex-1 min-w-4 h-px bg-border" />
             <div className={`flex items-center gap-2 ${checkoutStep === "payment" ? "text-primary font-semibold" : "text-foreground/50"}`}>
-              <span className={`w-7 h-7 rounded-full flex items-center justify-center text-sm ${checkoutStep === "payment" ? "bg-primary text-white" : "bg-border text-foreground/40"}`}>2</span>
-              <span className="text-sm">Payment</span>
+              <span className={`w-7 h-7 rounded-full flex items-center justify-center text-sm ${checkoutStep === "payment" ? "bg-primary text-white" : "bg-border text-foreground/40"}`}>3</span>
+              <span className="text-xs sm:text-sm">Payment</span>
+            </div>
+            <div className="ml-auto flex items-baseline gap-1.5 border-l border-border pl-3">
+              <span className="text-xs text-foreground/50">Total</span>
+              <span className="text-sm sm:text-base font-bold text-primary">{formatPrice(total, currency)}</span>
             </div>
           </div>
 
-          {/* ═══ STEP 1: Shipping ═══ */}
-          {checkoutStep === "shipping" && (
+          {/* ═══ STEP 1: Delivery Method ═══ */}
+          {checkoutStep === "delivery" && (
             <>
             {/* Delivery Method */}
             <div className="card mb-4">
@@ -755,6 +767,30 @@ export default function CheckoutPage() {
                 </div>
               )}
             </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                setCheckoutStep("shipping");
+                window.scrollTo({ top: 0, behavior: "smooth" });
+              }}
+              className="btn-primary w-full"
+            >
+              Continue to {fulfillmentMethod === "store_pickup" ? "Contact Details" : "Shipping Information"}
+            </button>
+            </>
+          )}
+
+          {/* ═══ STEP 2: Shipping Information ═══ */}
+          {checkoutStep === "shipping" && (
+            <>
+            <button
+              type="button"
+              onClick={() => setCheckoutStep("delivery")}
+              className="text-sm text-primary hover:underline font-medium mb-3"
+            >
+              ← Change delivery method
+            </button>
 
             <div className="card mb-6">
               <h2 className="text-lg font-semibold text-foreground mb-6">
@@ -1031,19 +1067,19 @@ export default function CheckoutPage() {
               {/* Shipping method selection (shipping orders only — pickup is free) */}
               {fulfillmentMethod === "store_pickup" ? (
                 <div className="card mb-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <h3 className="font-medium text-foreground">Pickup</h3>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setPaymentError("");
-                        setCheckoutStep("shipping");
-                      }}
-                      className="text-sm text-primary hover:underline font-medium"
-                    >
-                      Change
-                    </button>
-                  </div>
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="font-medium text-foreground">Pickup</h3>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPaymentError("");
+                      setCheckoutStep("delivery");
+                    }}
+                    className="text-sm text-primary hover:underline font-medium"
+                  >
+                    Change
+                  </button>
+                </div>
                   <div className="flex items-center justify-between rounded-lg border border-primary bg-primary/5 px-4 py-3">
                     <span>
                       <span className="block text-sm font-medium text-foreground">Pick up in store</span>
@@ -1236,10 +1272,29 @@ export default function CheckoutPage() {
           )}
         </div>
 
-        {/* Order summary — first on mobile, right column on desktop */}
+        {/* Order summary — collapsed drawer on mobile (Total always visible in its header), sticky column on desktop */}
         <div className="order-first lg:order-none lg:col-span-1">
           <div className="card sticky top-24 p-4 sm:p-6">
-            <h2 className="text-lg font-semibold text-foreground mb-4">
+            {/* Mobile: tap-to-expand drawer header carrying the running Total */}
+            <button
+              type="button"
+              onClick={() => setSummaryOpen((v) => !v)}
+              aria-expanded={summaryOpen}
+              className="lg:hidden w-full flex items-center justify-between gap-3"
+            >
+              <span className="flex items-center gap-2 font-semibold text-foreground">
+                <ShoppingBag className="w-4 h-4 text-primary" />
+                Order Summary
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="text-xs text-foreground/50">Total</span>
+                <span className="font-bold text-primary">{formatPrice(total, currency)}</span>
+                <ChevronDown className={`w-4 h-4 text-foreground/50 transition-transform ${summaryOpen ? "rotate-180" : ""}`} />
+              </span>
+            </button>
+
+            <div className={`${summaryOpen ? "block" : "hidden"} lg:block mt-4 lg:mt-0`}>
+            <h2 className="text-lg font-semibold text-foreground mb-4 hidden lg:block">
               Order Summary
             </h2>
 
@@ -1381,6 +1436,7 @@ export default function CheckoutPage() {
                 <CreditCard className="w-4 h-4" />
                 <span>Secure Payment via Stripe &amp; PayPal</span>
               </div>
+            </div>
             </div>
           </div>
         </div>
