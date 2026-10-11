@@ -7,14 +7,19 @@ const WHATSAPP_MESSAGE = encodeURIComponent("Hello Arade, I would like to make a
 
 export default function WhatsAppButton() {
   const [visible, setVisible] = useState(false);
+  const [hiddenOnCheckout, setHiddenOnCheckout] = useState(false);
 
   useEffect(() => {
-    // Show button after a short delay to avoid covering content on load
-    const timer = setTimeout(() => setVisible(true), 1500);
-    return () => clearTimeout(timer);
+    if (typeof window !== "undefined" && window.location.pathname.startsWith("/checkout")) {
+      setHiddenOnCheckout(true);
+    } else {
+      // Show button after a short delay to avoid covering content on load
+      const timer = setTimeout(() => setVisible(true), 1500);
+      return () => clearTimeout(timer);
+    }
   }, []);
 
-  if (!visible) return null;
+  if (!visible || hiddenOnCheckout) return null;
 
   return (
     <a

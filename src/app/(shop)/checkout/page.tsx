@@ -1288,11 +1288,11 @@ export default function CheckoutPage() {
               aria-expanded={summaryOpen}
               className="lg:hidden w-full flex items-center justify-between gap-3"
             >
-              <span className="flex items-center gap-2 font-semibold text-foreground">
+              <span className="flex items-center gap-2 font-semibold text-foreground whitespace-nowrap">
                 <ShoppingBag className="w-4 h-4 text-primary" />
                 Order Summary
               </span>
-              <span className="flex items-center gap-1.5">
+              <span className="flex items-center gap-1.5 whitespace-nowrap ml-auto">
                 <span className="text-xs text-foreground/50">Total</span>
                 <span className="font-bold text-primary">{formatPrice(total, currency)}</span>
                 <ChevronDown className={`w-4 h-4 text-foreground/50 transition-transform ${summaryOpen ? "rotate-180" : ""}`} />
