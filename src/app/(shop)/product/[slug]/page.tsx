@@ -198,6 +198,7 @@ export default async function ProductPage({
     shippingDestination: { "@type": "DefinedRegion", addressCountry },
     deliveryTime: {
       "@type": "ShippingDeliveryTime",
+      handlingTime: { "@type": "QuantitativeValue", minValue: 1, maxValue: 2, unitCode: "DAY" },
       transitTime: { "@type": "QuantitativeValue", minValue: 5, maxValue: 10, unitCode: "DAY" },
     },
   });
