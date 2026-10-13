@@ -4,6 +4,9 @@ import {
   createCanadaPostShipment,
   getCanadaPostRates,
   getShipmentLabelPdf,
+  getShipmentLabelZpl,
+  inspectLabelArtifact,
+  inspectZplLabel,
   previewShipmentPayload,
 } from "@/lib/canadapost";
 
@@ -23,6 +26,16 @@ import {
  *    [Production] apps, as any orders or shipments submitted through them
  *    will incur actual billing charges"):
  *      PowerShell:  $env:CANADAPOST_LIVE_TESTS="1"; $env:CANADAPOST_LIVE_SHIPMENT="1"; npm test
+ *
+ * 4. Verify an ALREADY stored label artifact really is a printable label
+ *    (read-only: downloads the artifact the order already points at). Without
+ *    CANADAPOST_LABEL_ORDER the most recent stored label is checked. Both
+ *    representations are checked: the PDF artifact (a deposit summary on a
+ *    [Test] app) and the ZPL one, which is the printable label — the ZPL is
+ *    what has to be a label for the order to be printable.
+ *      PowerShell:  $env:CANADAPOST_LIVE_TESTS="1"; $env:CANADAPOST_LIVE_LABEL="1"; npm test
+ *    A failure here is the answer, not a flake: it prints exactly why the
+ *    document is not a label (e.g. "[Test] app" keys, or a manifest hardcopy).
  */
 
 /** Load .env.local into process.env (never overwrites existing values). */
@@ -42,6 +55,7 @@ loadLocalEnv();
 
 const live = process.env.CANADAPOST_LIVE_TESTS === "1";
 const liveShipment = live && process.env.CANADAPOST_LIVE_SHIPMENT === "1";
+const liveLabel = live && process.env.CANADAPOST_LIVE_LABEL === "1";
 
 const requiredEnv = [
   "CANADAPOST_API_KEY",
@@ -138,6 +152,84 @@ describe.skipIf(!liveShipment)("Canada Post live shipment creation", () => {
       const header = new TextDecoder().decode(new Uint8Array(pdf.slice(0, 5)));
       console.log(`label PDF: ${pdf.byteLength} bytes, starts with "${header}"`);
       expect(pdf.byteLength).toBeGreaterThan(0);
+
+      // The same URL serves the printable label as ZPL. This is the artifact
+      // the admin route stores in label_zpl_url.
+      const zpl = await getShipmentLabelZpl(shipment.labelUrl);
+      const zplInspection = inspectZplLabel(zpl, shipment.trackingPin);
+      console.log(`printable ZPL: ${zpl.length} bytes`);
+      console.log(
+        `PDF verdict: ${inspectLabelArtifact(pdf, shipment.trackingPin).verdict}; ` +
+          `ZPL verdict: ${zplInspection.verdict}${zplInspection.reason ? ` - ${zplInspection.reason}` : ""}`
+      );
+      expect(
+        zplInspection.verdict,
+        zplInspection.reason ?? "the ZPL artifact is not a printable label"
+      ).toBe("label");
     }
+  });
+});
+
+/**
+ * Read-only: the artifact an order already points at. Set
+ * CANADAPOST_LABEL_ORDER=<order number> to check a specific order, otherwise
+ * the most recent order with a stored label_url is used.
+ */
+async function storedLabelArtifact(): Promise<{
+  orderNumber: string;
+  trackingPin: string | null;
+  labelUrl: string;
+}> {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
+  if (!supabaseUrl || !serviceKey) {
+    throw new Error(
+      "NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY missing - add them to .env.local"
+    );
+  }
+
+  const orderNumber = process.env.CANADAPOST_LABEL_ORDER?.trim();
+  const query = orderNumber
+    ? `orders?order_number=eq.${encodeURIComponent(orderNumber)}&select=order_number,tracking_number,label_url&limit=1`
+    : "orders?select=order_number,tracking_number,label_url&label_url=not.is.null&order=created_at.desc&limit=1";
+
+  const res = await fetch(`${supabaseUrl}/rest/v1/${query}`, {
+    headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` },
+  });
+  if (!res.ok) throw new Error(`Supabase REST ${res.status}: ${await res.text()}`);
+
+  const [row] = (await res.json()) as Array<{
+    order_number: string;
+    tracking_number: string | null;
+    label_url: string | null;
+  }>;
+  if (!row?.label_url) throw new Error("No order with a stored label_url was found");
+
+  return {
+    orderNumber: row.order_number,
+    trackingPin: row.tracking_number,
+    labelUrl: row.label_url,
+  };
+}
+
+describe.skipIf(!liveLabel)("Canada Post stored label artifact", () => {
+  it("serves a printable ZPL label (and reports what the PDF artifact is)", async () => {
+    const order = await storedLabelArtifact();
+    const pdf = await getShipmentLabelPdf(order.labelUrl);
+    const pdfInspection = inspectLabelArtifact(pdf, order.trackingPin);
+    const zpl = await getShipmentLabelZpl(order.labelUrl);
+    const zplInspection = inspectZplLabel(zpl, order.trackingPin);
+
+    console.log(`--- order ${order.orderNumber} ---`);
+    console.log(`PDF artifact: ${pdf.byteLength} bytes -> ${pdfInspection.verdict}${pdfInspection.reason ? ` (${pdfInspection.reason})` : ""}`);
+    console.log(`ZPL artifact: ${zpl.length} bytes -> ${zplInspection.verdict}${zplInspection.reason ? ` (${zplInspection.reason})` : ""}`);
+    console.log(`tracking PIN: ${order.trackingPin ?? "(none stored)"}`);
+
+    // The printable artifact is the ZPL. A [Test] app's PDF is a deposit
+    // summary, so only the ZPL verdict decides whether the order is printable.
+    expect(
+      zplInspection.verdict,
+      zplInspection.reason ?? `${order.orderNumber}: the stored artifact serves no printable label`
+    ).toBe("label");
   });
 });

@@ -43,6 +43,8 @@ interface OrderDetail {
   shipping_method_code: string | null;
   tracking_number: string | null;
   label_url: string | null;
+  label_zpl_url: string | null;
+  label_pdf_kind: "label" | "deposit_summary" | "unverified" | null;
   profiles: { full_name: string; email: string } | null;
   order_items: {
     id: string;
@@ -82,6 +84,16 @@ const pickupStatusLabels: Record<string, string> = {
   cancelled: "Cancelled",
 };
 
+/** Trigger a download of a same-origin URL without hijacking a tab. */
+function downloadFile(url: string) {
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+}
+
 /** Allowed pickup-status transitions (mirrors the server-side whitelist). */
 const PICKUP_TRANSITIONS: Record<string, string[]> = {
   preparing: ["picking", "ready", "cancelled"],
@@ -97,7 +109,8 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
   const [creatingShipment, setCreatingShipment] = useState(false);
-  const [shipmentMessage, setShipmentMessage] = useState<{ type: "error" | "success"; text: string } | null>(null);
+  const [downloadingLabel, setDownloadingLabel] = useState(false);
+  const [shipmentMessage, setShipmentMessage] = useState<{ type: "error" | "success" | "warning"; text: string } | null>(null);
   const supabase = createClient();
 
   useEffect(() => {
@@ -181,6 +194,18 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
     // label never opened itself. We navigate the pre-opened tab once the
     // shipment exists, and close it if creation fails.
     const labelWindow = window.open("about:blank", "_blank");
+    if (labelWindow) {
+      labelWindow.document.write(
+        `<!doctype html><html><head><title>Creating shipment…</title>
+        <style>body{font-family:sans-serif;display:flex;flex-direction:column;align-items:center;
+        justify-content:center;min-height:100vh;margin:0;background:#f9fafb;color:#374151;}
+        .spinner{width:40px;height:40px;border:4px solid #e5e7eb;border-top-color:#6366f1;
+        border-radius:50%;animation:spin 0.8s linear infinite;margin-bottom:16px;}
+        @keyframes spin{to{transform:rotate(360deg);}}</style></head>
+        <body><div class="spinner"></div><p>Creating shipment with Canada Post…</p></body></html>`
+      );
+      labelWindow.document.close();
+    }
     try {
       const res = await fetch(`/api/admin/orders/${id}/shipment`, {
         method: "POST",
@@ -194,19 +219,34 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
                 ...prev,
                 tracking_number: data.trackingNumber,
                 label_url: data.labelUrl,
+                label_zpl_url: data.labelZplUrl ?? null,
+                label_pdf_kind: data.labelPdfKind ?? null,
                 order_status: "shipped",
               }
             : prev
         );
         if (data.labelUrl) {
+          // Parcel label PDF renders inline in the pre-opened tab.
           if (labelWindow) {
             labelWindow.location.href = `/api/admin/orders/${id}/label`;
           } else {
             setShipmentMessage({
               type: "success",
-              text: `Shipment created — tracking ${data.trackingNumber}. Open the label with the View Label (PDF) button below.`,
+              text: `Shipment created — tracking ${data.trackingNumber}. Open the label with the buttons below.`,
             });
           }
+        } else if (data.labelZplUrl) {
+          // When only ZPL is available, download it.
+          labelWindow?.close();
+          downloadFile(`/api/admin/orders/${id}/label?format=zpl`);
+        } else {
+          labelWindow?.close();
+        }
+        if (data.warning) {
+          setShipmentMessage({
+            type: "warning",
+            text: `Shipment created — tracking ${data.trackingNumber}. ${data.warning}`,
+          });
         }
       } else {
         labelWindow?.close();
@@ -219,6 +259,47 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
       setCreatingShipment(false);
     }
   }
+  async function downloadLabel() {
+    if (downloadingLabel) return;
+    setDownloadingLabel(true);
+
+    // Open the tab NOW (synchronously in the click handler) so browsers allow it.
+    // Write a "please wait" page so the user isn't staring at a blank tab.
+    const labelWindow = window.open("about:blank", "_blank");
+    if (labelWindow) {
+      labelWindow.document.write(
+        `<!doctype html><html><head><title>Loading label…</title>
+        <style>body{font-family:sans-serif;display:flex;flex-direction:column;align-items:center;
+        justify-content:center;min-height:100vh;margin:0;background:#f9fafb;color:#374151;}
+        .spinner{width:40px;height:40px;border:4px solid #e5e7eb;border-top-color:#6366f1;
+        border-radius:50%;animation:spin 0.8s linear infinite;margin-bottom:16px;}
+        @keyframes spin{to{transform:rotate(360deg);}}</style></head>
+        <body><div class="spinner"></div><p>Preparing your shipping label…</p></body></html>`
+      );
+      labelWindow.document.close();
+    }
+
+    try {
+      // Ping the label API via fetch first — this lets us wait for the slow
+      // response (PDF fetch + ZPL fallback + Labelary conversion) before
+      // navigating the tab, so the tab never sits on a blank/loading page.
+      const res = await fetch(`/api/admin/orders/${id}/label`, { method: "HEAD" });
+      if (res.ok) {
+        if (labelWindow) {
+          labelWindow.location.href = `/api/admin/orders/${id}/label`;
+        }
+      } else {
+        labelWindow?.close();
+        setShipmentMessage({ type: "error", text: "Could not load the shipping label. Try again." });
+      }
+    } catch {
+      labelWindow?.close();
+      setShipmentMessage({ type: "error", text: "Network error loading label. Try again." });
+    } finally {
+      setDownloadingLabel(false);
+    }
+  }
+
 
   if (loading) {
     return (
@@ -227,6 +308,7 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
       </div>
     );
   }
+
 
   if (!order) {
     return (
@@ -240,6 +322,9 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
   }
 
   const shipping = order.shipping_address || {};
+  // Only a PDF the server confirmed as the parcel label is called a label;
+  // anything else (a [Test] app's deposit summary) is named as such.
+  const pdfIsLabel = order.label_pdf_kind === "label";
 
   return (
     <div>
@@ -454,7 +539,7 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
               <p className="text-xs text-foreground/50 mt-2">Only paid orders can be progressed.</p>
             )}
             {shipmentMessage && (
-              <p className={`mt-2 text-xs ${shipmentMessage.type === "success" ? "text-green-600" : "text-red-600"}`}>
+              <p className={`mt-2 text-xs ${shipmentMessage.type === "success" ? "text-green-600" : shipmentMessage.type === "warning" ? "text-amber-600" : "text-red-600"}`}>
                 {shipmentMessage.text}
               </p>
             )}
@@ -464,7 +549,6 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
           </div>
           ) : (
           <div className="card">
-            <h2 className="text-lg font-semibold text-foreground mb-4">Canada Post Shipment</h2>
             <h2 className="text-lg font-semibold text-foreground mb-4">Canada Post Shipment</h2>
             {order.shipping_method_name && (
               <p className="text-sm mb-2">
@@ -478,15 +562,42 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
                   <span className="text-foreground/60">Tracking PIN:</span>{" "}
                   <span className="font-mono font-medium">{order.tracking_number}</span>
                 </p>
-                <div className="flex flex-wrap gap-3">
-                  <button
-                    type="button"
-                    onClick={() => window.open(`/api/admin/orders/${id}/label`, "_blank")}
-                    className="btn-secondary inline-flex items-center gap-2 px-4 py-2 text-sm"
-                  >
-                    <Printer className="w-4 h-4" />
-                    View Label (PDF)
-                  </button>
+                <div className="flex flex-wrap items-center gap-3">
+                  {order.label_url ? (
+                    <button
+                      type="button"
+                      onClick={downloadLabel}
+                      disabled={downloadingLabel}
+                      className="btn-primary inline-flex items-center gap-2 px-4 py-2 text-sm font-medium disabled:opacity-60"
+                    >
+                      {downloadingLabel ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          Opening label…
+                        </>
+                      ) : (
+                        <>
+                          <Printer className="w-4 h-4" />
+                          Download Label (PDF)
+                        </>
+                      )}
+                    </button>
+                  ) : (
+                    <span className="self-center text-xs text-foreground/50">
+                      No PDF artifact was returned for this shipment.
+                    </span>
+                  )}
+                  {order.label_zpl_url && (
+                    <a
+                      href={`/api/admin/orders/${id}/label?format=zpl`}
+                      download
+                      className="inline-flex items-center gap-1.5 px-3 py-2 text-xs text-foreground/60 hover:text-foreground border border-border rounded-lg transition-colors"
+                      title="For thermal label printers"
+                    >
+                      <Printer className="w-3.5 h-3.5" />
+                      Thermal (ZPL)
+                    </a>
+                  )}
                   <a
                     href={`https://www.canadapost-postescanada.ca/track-reperage/en#/details/${order.tracking_number}`}
                     target="_blank"
@@ -523,7 +634,7 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
               </div>
             )}
             {shipmentMessage && (
-              <p className={`mt-2 text-xs ${shipmentMessage.type === "success" ? "text-green-600" : "text-red-600"}`}>
+              <p className={`mt-2 text-xs ${shipmentMessage.type === "success" ? "text-green-600" : shipmentMessage.type === "warning" ? "text-amber-600" : "text-red-600"}`}>
                 {shipmentMessage.text}
               </p>
             )}

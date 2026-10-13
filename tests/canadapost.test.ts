@@ -36,6 +36,8 @@ function stubFetch(handlers: {
   shipment?: () => Response;
   rates?: () => Response;
   tracking?: () => Response;
+  /** Shipment artifact endpoint; receives the Accept header of the request. */
+  artifact?: (accept: string) => Response;
 }) {
   const mock = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
     const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
@@ -58,6 +60,9 @@ function stubFetch(handlers: {
     if (url.endsWith("/shipments") && handlers.shipment) return handlers.shipment();
     if (url.endsWith("/prices") && handlers.rates) return handlers.rates();
     if (url.includes("/tracking/v1/pins/") && handlers.tracking) return handlers.tracking();
+    if (url.includes("/artifacts/") && handlers.artifact) {
+      return handlers.artifact(captured[captured.length - 1].headers.Accept ?? "");
+    }
     throw new Error(`Unexpected fetch to ${url}`);
   });
 
@@ -260,6 +265,7 @@ describe("Canada Post shipment transport & errors", () => {
       shipmentId: "123",
       trackingPin: "4567890123456789",
       labelUrl: null,
+      artifactCandidates: [],
     });
   });
 

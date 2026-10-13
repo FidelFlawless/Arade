@@ -5,7 +5,6 @@ import Link from "next/link";
 import Image from "next/image";
 
 import { useCart } from "@/components/providers/CartProvider";
-
 interface ProductCardProps {
   id: string;
   name: string;

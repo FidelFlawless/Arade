@@ -314,6 +314,8 @@ export interface Order {
   shipping_method_name?: string | null;
   tracking_number?: string | null;
   label_url?: string | null;
+  label_zpl_url?: string | null;
+  label_pdf_kind?: "label" | "deposit_summary" | "unverified" | null;
   shipping_first_name: string;
   shipping_last_name: string;
   shipping_email: string;
@@ -391,6 +393,8 @@ export interface OrderInsert {
   shipping_method_name?: string | null;
   tracking_number?: string | null;
   label_url?: string | null;
+  label_zpl_url?: string | null;
+  label_pdf_kind?: "label" | "deposit_summary" | "unverified" | null;
   shipping_first_name: string;
   shipping_last_name: string;
   shipping_email: string;
@@ -426,6 +430,8 @@ export interface OrderUpdate {
   shipping_method_name?: string | null;
   tracking_number?: string | null;
   label_url?: string | null;
+  label_zpl_url?: string | null;
+  label_pdf_kind?: "label" | "deposit_summary" | "unverified" | null;
   notes?: string | null;
   updated_at?: string;
 }
