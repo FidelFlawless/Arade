@@ -186,7 +186,7 @@ export default async function ProductPage({
 
   // Shipping details per offer - mirrors /shipping: Canada + United States,
   // delivery fee is the checkout fee for that country/currency (free at
-  // C$180+, which structured data can't express as a threshold), 5-10 business
+  // C$200+, which structured data can't express as a threshold), 5-10 business
   // days in transit after processing.
   const offerShippingDetails = (
     addressCountry: string,
@@ -372,7 +372,7 @@ export default async function ProductPage({
           <div className="mt-8 grid grid-cols-3 gap-4 text-center">
             <div className="p-3 bg-muted rounded-lg">
               <p className="text-xs text-foreground/60">Free Delivery</p>
-              <p className="text-xs font-medium text-foreground">Orders $180+</p>
+              <p className="text-xs font-medium text-foreground">Orders $200+</p>
             </div>
             <div className="p-3 bg-muted rounded-lg">
               <p className="text-xs text-foreground/60">Secure Payment</p>

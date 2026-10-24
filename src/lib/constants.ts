@@ -4,10 +4,12 @@ export const SITE_DESCRIPTION =
   "Your destination for beauty, skincare, hair and fashion. Curated products to elevate your everyday routine.";
 export const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://www.aradeshop.com";
 
-// Delivery settings
-export const FREE_DELIVERY_THRESHOLD = 180; // Orders $180+ get free delivery
-export const DELIVERY_FEE_CAD = 20;
-export const DELIVERY_FEE_USD = 14.29;
+// Delivery settings (flat rate — Canada Post live rates are only used for
+// labels/tracking, never for what the customer is charged at checkout).
+// These are fallbacks; the live values come from Admin -> Settings.
+export const FREE_DELIVERY_THRESHOLD = 200; // Orders of $200+ (CAD or USD) ship free
+export const DELIVERY_FEE_CAD = 40;
+export const DELIVERY_FEE_USD = 40;
 
 // Supported countries
 export const SUPPORTED_COUNTRIES = [

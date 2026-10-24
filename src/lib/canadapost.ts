@@ -326,6 +326,20 @@ export class CanadaPostError extends Error {
   }
 }
 
+/**
+ * True for a real Canada Post service code such as `DOM.EP` or `USA.TP`.
+ *
+ * Checkout now stores the generic `standard` method code because delivery is
+ * priced flat, so label creation has to resolve a real service code before
+ * calling the Shipping API. Codes written by the old live-rate checkout match
+ * this pattern and are used as-is.
+ */
+export function isCanadaPostServiceCode(
+  code: string | null | undefined
+): code is string {
+  return Boolean(code && /^[A-Z]{2,4}\.[A-Z]{2,3}$/.test(code));
+}
+
 // ─── Shipment creation (Phase 2) ─────────────────────────────────────────
 
 interface ShipmentRequest {

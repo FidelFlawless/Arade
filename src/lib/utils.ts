@@ -1,12 +1,7 @@
 import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
-import {
-  CANADIAN_PROVINCES,
-  DELIVERY_FEE_CAD,
-  DELIVERY_FEE_USD,
-  FREE_DELIVERY_THRESHOLD,
-  US_STATES,
-} from "@/lib/constants";
+import { CANADIAN_PROVINCES, US_STATES } from "@/lib/constants";
+import { deliveryFeeFor, type ShippingSettings } from "@/lib/shipping";
 
 // Merge Tailwind classes safely
 export function cn(...inputs: ClassValue[]) {
@@ -25,6 +20,18 @@ export function formatPrice(
     maximumFractionDigits: 2,
   });
   return formatter.format(amount);
+}
+
+// Format a whole-amount price (e.g. a free-delivery threshold) without cents.
+export function formatWholePrice(
+  amount: number,
+  currency: "CAD" | "USD" = "CAD"
+): string {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency,
+    maximumFractionDigits: 0,
+  }).format(amount);
 }
 
 // Format date nicely
@@ -62,13 +69,14 @@ export function truncate(text: string, length: number): string {
   return text.slice(0, length).trimEnd() + "...";
 }
 
-// Calculate delivery fee
+// Calculate the flat delivery fee (free at/above the configured threshold).
+// Pass the admin-configured settings when available; defaults apply otherwise.
 export function calculateDeliveryFee(
   subtotal: number,
-  currency: "CAD" | "USD" = "CAD"
+  currency: "CAD" | "USD" = "CAD",
+  settings?: ShippingSettings
 ): number {
-  if (subtotal >= FREE_DELIVERY_THRESHOLD) return 0;
-  return currency === "CAD" ? DELIVERY_FEE_CAD : DELIVERY_FEE_USD;
+  return deliveryFeeFor(subtotal, currency, settings);
 }
 
 // Get the appropriate currency symbol

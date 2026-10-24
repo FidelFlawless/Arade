@@ -7,10 +7,9 @@ import {
   isValidShippingPostalCode,
   isValidShippingRegion,
 } from "@/lib/utils";
-import { validateCoupon, recordCouponUsage } from "@/lib/coupons";
-import { getCanadaPostRates, CanadaPostError } from "@/lib/canadapost";
-
-const DEFAULT_ITEM_WEIGHT_GRAMS = 250;
+import { validateCoupon } from "@/lib/coupons";
+import { getShippingSettings } from "@/lib/shipping-settings";
+import { deliveryFeeFor, shippingOptionName } from "@/lib/shipping";
 
 function getStripe() {
   const rawKey = process.env.STRIPE_SECRET_KEY || "";
@@ -184,14 +183,12 @@ export async function POST(req: NextRequest) {
 
     // 5. Delivery fee / fulfillment method.
     //
-    //   * `store_pickup` => the customer pays nothing online for shipping.
-    //     Delivery fee = 0, shipping_method tracking fields = null, and the
-    //     whole Canada Post rating path is skipped. This is the ONLY code path
-    //     that can authorise a pickup order, so it enforces the business rule
-    //     entirely server-side (the browser could otherwise smuggle a
-    //     shippingMethod in).
-    //   * `shipping` (default) => existing Canada Post live-rate flow,
-    //     untouched.
+    //   * `store_pickup` => the customer pays nothing for shipping.
+    //   * `shipping` (default) => Arade's flat delivery rate, computed here
+    //     from Admin -> Settings (free at/above the threshold, flat fee
+    //     below). Canada Post live rates are NOT used to price delivery —
+    //     they are only used for labels and tracking. Computing the fee
+    //     server-side means the browser cannot choose its own price.
     let deliveryFee = 0;
     let shippingMethodName: string | null = null;
 
@@ -206,43 +203,9 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      try {
-        const productIds = items.map((item: { productId: string }) => item.productId);
-        const { data: weightRows } = await supabaseAdmin
-          .from("products")
-          .select("id, weight_grams")
-          .in("id", productIds);
-        const totalWeightKg =
-          items.reduce((sum: number, item: { productId: string; quantity: number }) => {
-            const row = weightRows?.find((w) => w.id === item.productId);
-            const grams = (row?.weight_grams ?? DEFAULT_ITEM_WEIGHT_GRAMS) * item.quantity;
-            return sum + grams;
-          }, 0) / 1000;
-
-        const rates = await getCanadaPostRates({
-          destinationCountry: country,
-          destinationPostalCode: shippingAddress.postal_code,
-          weightKg: totalWeightKg,
-        });
-        const chosen = rates.find((r) => r.serviceCode === shippingMethod.code);
-        if (!chosen) {
-          return NextResponse.json(
-            { error: "The selected shipping option is no longer available. Please pick another one." },
-            { status: 400 }
-          );
-        }
-        deliveryFee = chosen.price;
-        shippingMethodName = chosen.serviceName;
-      } catch (err) {
-        if (err instanceof CanadaPostError) {
-          console.error("Canada Post checkout rates error:", err.message);
-          return NextResponse.json(
-            { error: "Shipping is temporarily unavailable. Please try again in a moment." },
-            { status: 502 }
-          );
-        }
-        throw err;
-      }
+      const shippingSettings = await getShippingSettings();
+      deliveryFee = deliveryFeeFor(subtotal, currency, shippingSettings);
+      shippingMethodName = shippingOptionName(deliveryFee);
     }
 
     const total = Math.round((subtotal + deliveryFee) * 100) / 100;

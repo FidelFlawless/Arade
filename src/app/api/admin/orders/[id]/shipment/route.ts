@@ -3,10 +3,12 @@ import { createClient } from "@supabase/supabase-js";
 import { requireAdminUser } from "@/lib/auth/admin";
 import {
   createCanadaPostShipment,
+  getCanadaPostRates,
   getShipmentLabelPdf,
   getShipmentLabelZpl,
   inspectLabelArtifact,
   inspectZplLabel,
+  isCanadaPostServiceCode,
   CanadaPostError,
   type LabelPdfKind,
 } from "@/lib/canadapost";
@@ -237,9 +239,51 @@ export async function POST(
       country: order.shipping_country as "CA" | "US",
     };
 
+    // Canada Post needs one of ITS service codes (DOM.EP, USA.TP, …). Flat-rate
+    // checkout stores the generic "standard" code, so quote the parcel once to
+    // resolve a real service — Expedited Parcel when offered, else the
+    // cheapest. Orders from the old live-rate flow already hold a valid Canada
+    // Post code and skip the extra call.
+    let serviceCode: string | null = order.shipping_method_code;
+    if (!isCanadaPostServiceCode(serviceCode)) {
+      try {
+        const rates = await getCanadaPostRates({
+          destinationCountry: destination.country,
+          destinationPostalCode: destination.postalCode,
+          weightKg: totalWeightKg,
+        });
+        const preferred = rates.find((rate) => /expedited parcel/i.test(rate.serviceName));
+        const cheapest = rates.length
+          ? rates.reduce((a, b) => (a.price <= b.price ? a : b))
+          : null;
+        serviceCode = (preferred ?? cheapest)?.serviceCode ?? null;
+      } catch (err) {
+        if (err instanceof CanadaPostError) {
+          console.error("Canada Post label service lookup failed:", err.message);
+          return NextResponse.json(
+            {
+              error: `Canada Post could not quote this parcel, so no label was created: ${err.message}`,
+            },
+            { status: 502 }
+          );
+        }
+        throw err;
+      }
+
+      if (!serviceCode) {
+        return NextResponse.json(
+          {
+            error:
+              "Canada Post returned no shipping services for this address, so a label cannot be created.",
+          },
+          { status: 400 }
+        );
+      }
+    }
+
     try {
       const shipment = await createCanadaPostShipment({
-        serviceCode: order.shipping_method_code,
+        serviceCode,
         destination,
         weightKg: totalWeightKg,
         orderId: order.order_number,

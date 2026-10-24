@@ -116,10 +116,14 @@ function productionZpl(): string {
 }
 
 let artifactCalls: string[] = [];
+let ratingCalls = 0;
+let shipmentPayloads: Record<string, unknown>[] = [];
 
 /** Answer the OAuth call, Create Shipment, and the artifact endpoint. */
 function stubCanadaPost(options: { pdfContent: string; zpl: string }) {
   artifactCalls = [];
+  ratingCalls = 0;
+  shipmentPayloads = [];
   vi.stubGlobal(
     "fetch",
     vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
@@ -128,7 +132,25 @@ function stubCanadaPost(options: { pdfContent: string; zpl: string }) {
       if (url.includes("/oauth2/token")) {
         return jsonResponse({ access_token: "test-token", expires_in: 3600 });
       }
+      if (url.includes("/rating/v1/prices")) {
+        ratingCalls += 1;
+        return jsonResponse([
+          {
+            serviceCode: "DOM.XP",
+            serviceName: "Xpresspost",
+            priceDetails: { due: 8.5 },
+            serviceStandard: { expectedTransitTime: 2 },
+          },
+          {
+            serviceCode: "DOM.EP",
+            serviceName: "Expedited Parcel",
+            priceDetails: { due: 12.5 },
+            serviceStandard: { expectedTransitTime: 4 },
+          },
+        ]);
+      }
       if (url.endsWith("/shipments")) {
+        shipmentPayloads.push(JSON.parse(String(init?.body ?? "{}")));
         return jsonResponse({
           shipmentId: SHIPMENT_ID,
           shipmentStatus: "created",
@@ -260,6 +282,34 @@ describe("POST /api/admin/orders/[id]/shipment", () => {
     // The admin is told what the PDF artifact really is.
     expect(body.warning).toContain("not a shipping label");
     expect(body.warning).toContain("printable label is available in ZPL");
+
+    // Legacy orders already hold a real Canada Post code: no extra quote call.
+    expect(ratingCalls).toBe(0);
+  });
+
+  it("resolves a real Canada Post service code for flat-rate orders", async () => {
+    const { POST } = await loadShipmentRoute();
+    // Flat-rate checkout stores the generic "standard" method code.
+    state.order = {
+      ...paidOrder(),
+      shipping_method_code: "standard",
+      shipping_method_name: "Standard Delivery",
+    };
+    stubCanadaPost({
+      pdfContent: `BT (PIN ${TRACKING_PIN}) Tj ET`,
+      zpl: productionZpl(),
+    });
+
+    const res = await POST(request("http://localhost/api/admin/orders/x/shipment"), {
+      params: Promise.resolve({ id: "x" }),
+    });
+
+    expect(res.status).toBe(200);
+    // One quote is made to turn "standard" into a service Canada Post accepts.
+    expect(ratingCalls).toBe(1);
+    const deliverySpec = shipmentPayloads[0].deliverySpec as { serviceCode: string };
+    // Expedited Parcel wins over the cheaper Xpresspost quote.
+    expect(deliverySpec.serviceCode).toBe("DOM.EP");
   });
 
   it("stores the PDF as the label when the artifact really is one", async () => {

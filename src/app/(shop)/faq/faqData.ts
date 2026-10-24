@@ -42,7 +42,7 @@ export const faqCategories: FaqCategory[] = [
       },
       {
         q: "How much does shipping cost?",
-        a: "Shipping is free for orders of C$180 or more. For orders below C$180, a delivery fee applies and will be calculated at checkout based on your location.",
+        a: "Shipping is free for orders of C$200 or more (US$200 for orders shipped to the United States). Orders below that amount are charged a flat delivery fee of C$40 (US$40), shown at checkout before you pay.",
       },
       {
         q: "How long does delivery take?",

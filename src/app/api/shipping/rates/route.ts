@@ -1,30 +1,36 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { getCanadaPostRates, CanadaPostError } from "@/lib/canadapost";
+import { getShippingSettings } from "@/lib/shipping-settings";
+import {
+  STANDARD_SHIPPING_CODE,
+  deliveryFeeFor,
+  freeDeliveryRemaining,
+  shippingOptionName,
+} from "@/lib/shipping";
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-// Default packed weight per item in grams if a product has no weight set.
-const DEFAULT_ITEM_WEIGHT_GRAMS = 250;
-
 /**
  * POST /api/shipping/rates
- * Body: { country: "CA"|"US", postalCode: string, items: [{ productId, quantity }] }
+ * Body: { country: "CA"|"US", items: [{ productId, quantity }] }
  *
- * Returns live Canada Post rates. On any Canada Post failure this returns a
- * controlled server error — there is NO flat-rate fallback.
+ * Returns Arade's own flat delivery option. Delivery is no longer priced with
+ * live Canada Post rates: orders at/above the free-delivery threshold (set in
+ * Admin -> Settings) are free, everything below is charged the configured flat
+ * fee in the order currency. Canada Post is still used for labels and
+ * tracking, but never to decide what the customer pays for delivery.
  */
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { country, postalCode, items } = body;
+    const { country, items } = body;
 
-    if ((country !== "CA" && country !== "US") || !postalCode) {
+    if (country !== "CA" && country !== "US") {
       return NextResponse.json(
-        { error: "A valid country and postal code are required" },
+        { error: "A valid country is required" },
         { status: 400 }
       );
     }
@@ -33,10 +39,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Cart is empty" }, { status: 400 });
     }
 
-    const productIds = items.map((i: { productId: string }) => i.productId);
+    const currency = country === "CA" ? "CAD" : "USD";
+
+    const productIds = items.map((item: { productId: string }) => item.productId);
     const { data: dbProducts, error } = await supabaseAdmin
       .from("products")
-      .select("id, weight_grams")
+      .select("id, price_cad, price_usd")
       .in("id", productIds)
       .eq("is_active", true);
 
@@ -44,31 +52,37 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Failed to verify products" }, { status: 500 });
     }
 
-    // Total packed weight in kg (items are shipped in one parcel).
-    const totalWeightKg =
-      items.reduce((sum: number, item: { productId: string; quantity: number }) => {
-        const p = dbProducts.find((row) => row.id === item.productId);
-        const grams = (p?.weight_grams ?? DEFAULT_ITEM_WEIGHT_GRAMS) * item.quantity;
-        return sum + grams;
-      }, 0) / 1000;
+    // Server-side subtotal, never the browser's number.
+    const subtotal = items.reduce(
+      (sum: number, item: { productId: string; quantity: number }) => {
+        const product = dbProducts.find((row) => row.id === item.productId);
+        const price = Number(
+          currency === "CAD" ? product?.price_cad : product?.price_usd
+        ) || 0;
+        return sum + price * item.quantity;
+      },
+      0
+    );
 
-    try {
-      const rates = await getCanadaPostRates({
-        destinationCountry: country,
-        destinationPostalCode: postalCode,
-        weightKg: totalWeightKg,
-      });
-      return NextResponse.json({ success: true, rates });
-    } catch (err) {
-      if (err instanceof CanadaPostError) {
-        console.error("Canada Post rates error:", err.message);
-        return NextResponse.json(
-          { error: "Shipping is temporarily unavailable. Please try again in a moment." },
-          { status: 502 }
-        );
-      }
-      throw err;
-    }
+    const settings = await getShippingSettings();
+    const deliveryFee = deliveryFeeFor(subtotal, currency, settings);
+
+    return NextResponse.json({
+      success: true,
+      currency,
+      subtotal: Math.round(subtotal * 100) / 100,
+      deliveryFee,
+      freeDeliveryRemaining: freeDeliveryRemaining(subtotal, settings),
+      freeDeliveryThreshold: settings.freeDeliveryThreshold,
+      rates: [
+        {
+          serviceCode: STANDARD_SHIPPING_CODE,
+          serviceName: shippingOptionName(deliveryFee),
+          price: deliveryFee,
+          transitDays: null,
+        },
+      ],
+    });
   } catch (error: unknown) {
     console.error("Shipping rates error:", error);
     const message = error instanceof Error ? error.message : "Internal server error";

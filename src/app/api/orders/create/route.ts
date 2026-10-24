@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { FREE_DELIVERY_THRESHOLD, DELIVERY_FEE_CAD, DELIVERY_FEE_USD } from "@/lib/constants";
+import { getShippingSettings } from "@/lib/shipping-settings";
+import { deliveryFeeFor } from "@/lib/shipping";
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -92,12 +93,10 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // 5. Calculate delivery fee SERVER-SIDE
-    const deliveryFee = subtotal >= FREE_DELIVERY_THRESHOLD
-      ? 0
-      : currency === "CAD"
-        ? DELIVERY_FEE_CAD
-        : DELIVERY_FEE_USD;
+    // 5. Calculate the flat delivery fee SERVER-SIDE (never Canada Post rates).
+    // Free at/above the threshold; otherwise the flat fee for the currency.
+    const shippingSettings = await getShippingSettings();
+    const deliveryFee = deliveryFeeFor(subtotal, currency, shippingSettings);
 
     const total = subtotal + deliveryFee;
 

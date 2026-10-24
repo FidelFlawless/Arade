@@ -10,6 +10,7 @@ import { useAuth } from "@/components/providers/AuthProvider";
 import { createClient } from "@/lib/supabase/client";
 import {
   formatPrice,
+  formatWholePrice,
   isValidEmail,
   isValidNorthAmericanPhone,
   isValidShippingPostalCode,
@@ -17,6 +18,19 @@ import {
   provincePostalMismatch,
 } from "@/lib/utils";
 import { CANADIAN_PROVINCES, US_STATES } from "@/lib/constants";
+import {
+  STANDARD_SHIPPING_CODE,
+  deliveryFeeFor,
+  freeDeliveryRemaining,
+  shippingOptionName,
+  type ShippingSettings,
+} from "@/lib/shipping";
+
+/** Coerce a settings value to a non-negative number, falling back when invalid. */
+function settingsNumber(value: unknown, fallback: number): number {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
+}
 
 interface ShippingForm {
   first_name: string;
@@ -59,7 +73,7 @@ export default function CheckoutPage() {
   // Mobile: order summary lives in a collapsed drawer; the Total stays
   // visible in the step header above it at all times.
   const [summaryOpen, setSummaryOpen] = useState(false);
-  // Delivery method: Canada Post shipping (default) or free in-store pickup.
+  // Delivery method: flat-rate shipping (default) or free in-store pickup.
   const [fulfillmentMethod, setFulfillmentMethod] = useState<"shipping" | "store_pickup">("shipping");
   // The detail form (shipping address or pickup contact) stays tucked away
   // until a delivery method is picked and the shopper asks to enter details.
@@ -97,17 +111,6 @@ export default function CheckoutPage() {
   const [paypalError, setPaypalError] = useState<string | null>(null);
   const [paypalRetry, setPaypalRetry] = useState(0);
 
-  // Canada Post live rates (fetched when the shipping address is confirmed)
-  interface ShippingRate {
-    serviceCode: string;
-    serviceName: string;
-    price: number;
-    transitDays: number | null;
-  }
-  const [shippingRates, setShippingRates] = useState<ShippingRate[]>([]);
-  const [ratesLoading, setRatesLoading] = useState(false);
-  const [ratesError, setRatesError] = useState("");
-  const [selectedRate, setSelectedRate] = useState<ShippingRate | null>(null);
 
   // Guest checkout: no login wall. Signed-in users get their profile info
   // pre-filled below; guests simply fill in the form themselves.
@@ -144,9 +147,9 @@ export default function CheckoutPage() {
   }, [user, profile, supabase]);
 
   const [storeSettings, setStoreSettings] = useState({
-    free_delivery_threshold: 180,
-    delivery_fee_cad: 20,
-    delivery_fee_usd: 14.29,
+    free_delivery_threshold: 200,
+    delivery_fee_cad: 40,
+    delivery_fee_usd: 40,
     // Optional pickup-store configuration. Left blank until the client
     // supplies the real store details; the UI falls back to generic copy.
     pickup_location: "",
@@ -157,9 +160,9 @@ export default function CheckoutPage() {
   useEffect(() => {
     fetch("/api/settings").then((r) => r.json()).then((data) => {
       setStoreSettings({
-        free_delivery_threshold: Number(data.free_delivery_threshold) || 180,
-        delivery_fee_cad: Number(data.delivery_fee_cad) || 20,
-        delivery_fee_usd: Number(data.delivery_fee_usd) || 14.29,
+        free_delivery_threshold: settingsNumber(data.free_delivery_threshold, 200),
+        delivery_fee_cad: settingsNumber(data.delivery_fee_cad, 40),
+        delivery_fee_usd: settingsNumber(data.delivery_fee_usd, 40),
         pickup_location: typeof data.pickup_location === "string" ? data.pickup_location : "",
         pickup_address: typeof data.pickup_address === "string" ? data.pickup_address : "",
         pickup_preparation_minutes: data.pickup_preparation_minutes != null ? String(data.pickup_preparation_minutes) : "",
@@ -174,8 +177,21 @@ export default function CheckoutPage() {
     (sum, item) => sum + item[priceKey] * item.quantity,
     0
   );
-  // Pickup is always free; shipping uses the selected live Canada Post rate.
-  const deliveryFee = fulfillmentMethod === "store_pickup" ? 0 : (selectedRate?.price ?? 0);
+  // Pickup is always free; delivery is Arade's flat rate from Admin -> Settings
+  // (free at/above the threshold, flat fee below). Canada Post no longer prices
+  // delivery - it is only used for labels and tracking.
+  const shippingSettings: ShippingSettings = {
+    freeDeliveryThreshold: storeSettings.free_delivery_threshold,
+    deliveryFeeCad: storeSettings.delivery_fee_cad,
+    deliveryFeeUsd: storeSettings.delivery_fee_usd,
+  };
+  const deliveryFee = fulfillmentMethod === "store_pickup"
+    ? 0
+    : deliveryFeeFor(subtotal, currency, shippingSettings);
+  const shippingServiceName = shippingOptionName(deliveryFee);
+  const freeDeliveryGap = fulfillmentMethod === "shipping"
+    ? freeDeliveryRemaining(subtotal, shippingSettings)
+    : 0;
   const discount = appliedCoupon?.discount || 0;
   const payableSubtotal = Math.max(0, subtotal - discount);
   const total = payableSubtotal + deliveryFee;
@@ -310,7 +326,7 @@ export default function CheckoutPage() {
       quantity: item.quantity,
     })), [cartItems]);
 
-  // ─── Step 1 -> Step 2: Validate, then fetch live Canada Post rates ──
+  // ─── Step 1 -> Step 2: Validate the address, then show payment ──
   const handleContinueToPayment = async () => {
     setPaymentError("");
     const errs = validateForm();
@@ -330,50 +346,11 @@ export default function CheckoutPage() {
       return;
     }
 
-    // In-store pickup: no Canada Post involvement at all - go straight to
-    // payment. Pickup is free and fulfilled manually from the store.
-    if (fulfillmentMethod === "store_pickup") {
-      setRatesError("");
-      setSelectedRate(null);
-      setCheckoutStep("payment");
-      window.scrollTo({ top: 0, behavior: "smooth" });
-      return;
-    }
-
-    // Fetch live Canada Post rates for this address. No flat-rate fallback:
-    // if rates fail we stay on step 1 and show a retryable error.
-    setRatesLoading(true);
-    setRatesError("");
-    try {
-      const res = await fetch("/api/shipping/rates", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          country: form.country,
-          postalCode: form.postal_code,
-          items: buildItems(),
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        setRatesError(data.error || "Could not load shipping options. Please try again.");
-        return;
-      }
-      const rates: ShippingRate[] = data.rates || [];
-      if (rates.length === 0) {
-        setRatesError("No shipping options are available for this address. Please double-check your postal code.");
-        return;
-      }
-      const prev = selectedRate ? rates.find((r) => r.serviceCode === selectedRate.serviceCode) : null;
-      setShippingRates(rates);
-      setSelectedRate(prev || rates.reduce((a, b) => (a.price <= b.price ? a : b)));
-      setCheckoutStep("payment");
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    } catch {
-      setRatesError("Could not load shipping options. Please check your connection and try again.");
-    } finally {
-      setRatesLoading(false);
-    }
+    // Delivery pricing is flat and computed from Admin -> Settings, so there
+    // is nothing to fetch here - and no Canada Post pricing call. Pickup is
+    // free; shipping is either free (at/above the threshold) or the flat fee.
+    setCheckoutStep("payment");
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   // ─── Stripe checkout ─────────────────────────────────────────
@@ -411,7 +388,9 @@ export default function CheckoutPage() {
           pickupPreparationTime: storeSettings.pickup_preparation_minutes
             ? `${storeSettings.pickup_preparation_minutes} minutes`
             : null,
-          shippingMethod: selectedRate ? { code: selectedRate.serviceCode, name: selectedRate.serviceName } : null,
+          shippingMethod: fulfillmentMethod === "shipping"
+            ? { code: STANDARD_SHIPPING_CODE, name: shippingServiceName }
+            : null,
         }),
       });
 
@@ -427,7 +406,7 @@ export default function CheckoutPage() {
       setPaymentError("Unable to start checkout. Please check your connection and try again.");
       setLoading(false);
     }
-  }, [user, form.country, currency, appliedCoupon, fulfillmentMethod, storeSettings, buildItems, buildShippingAddress, selectedRate, supabase]);
+  }, [user, form.country, currency, appliedCoupon, fulfillmentMethod, storeSettings, buildItems, buildShippingAddress, shippingServiceName, supabase]);
 
   // ─── PayPal checkout ─────────────────────────────────────────
   const handleCreatePayPalOrder = useCallback(async () => {
@@ -461,7 +440,9 @@ export default function CheckoutPage() {
         pickupPreparationTime: storeSettings.pickup_preparation_minutes
           ? `${storeSettings.pickup_preparation_minutes} minutes`
           : null,
-        shippingMethod: selectedRate ? { code: selectedRate.serviceCode, name: selectedRate.serviceName } : null,
+        shippingMethod: fulfillmentMethod === "shipping"
+          ? { code: STANDARD_SHIPPING_CODE, name: shippingServiceName }
+          : null,
       }),
     });
 
@@ -476,7 +457,7 @@ export default function CheckoutPage() {
     sessionStorage.setItem("paypal_order_number", data.orderNumber);
 
     return data.paypalOrderId;
-  }, [user, form.country, currency, appliedCoupon, fulfillmentMethod, storeSettings, buildItems, buildShippingAddress, selectedRate, supabase]);
+  }, [user, form.country, currency, appliedCoupon, fulfillmentMethod, storeSettings, buildItems, buildShippingAddress, shippingServiceName, supabase]);
 
   const handlePayPalApprove = useCallback(async (data: { orderID: string }) => {
     const res = await fetch("/api/checkout/paypal/capture", {
@@ -718,7 +699,9 @@ export default function CheckoutPage() {
                   <span className="flex-1">
                     <span className="block font-medium text-foreground">Ship to my address</span>
                     <span className="block text-xs text-foreground/50 mt-0.5">
-                      Delivered by Canada Post — live rates calculated for your address at checkout.
+                      Flat-rate delivery — free on orders of {" "}
+                      {formatWholePrice(storeSettings.free_delivery_threshold, currency)} or more,
+                      otherwise {formatPrice(deliveryFeeFor(subtotal, currency, shippingSettings), currency)}.
                     </span>
                   </span>
                 </label>
@@ -1009,25 +992,12 @@ export default function CheckoutPage() {
               </div>
 
               {/* Continue to Payment button */}
-              {ratesError && (
-                <div role="alert" className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 mt-4">
-                  {ratesError}
-                </div>
-              )}
               <button
                 type="button"
                 onClick={handleContinueToPayment}
-                disabled={ratesLoading}
                 className="btn-primary w-full flex items-center justify-center gap-2 mt-6"
               >
-                {ratesLoading ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Finding shipping options...
-                  </>
-                ) : (
-                  "Continue to Payment"
-                )}
+                Continue to Payment
               </button>
             </div>
             </>
@@ -1114,43 +1084,30 @@ export default function CheckoutPage() {
                     Change
                   </button>
                 </div>
-                {ratesError && (
-                  <div role="alert" className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 mb-3">
-                    {ratesError}
-                  </div>
-                )}
-                <div className="space-y-2">
-                  {shippingRates.map((rate) => (
-                    <label
-                      key={rate.serviceCode}
-                      className={`flex items-center justify-between rounded-lg border px-4 py-3 cursor-pointer transition-colors ${
-                        selectedRate?.serviceCode === rate.serviceCode
-                          ? "border-primary bg-primary/5"
-                          : "border-border hover:border-primary/40"
-                      }`}
-                    >
-                      <span className="flex items-center gap-3">
-                        <input
-                          type="radio"
-                          name="shipping-method"
-                          checked={selectedRate?.serviceCode === rate.serviceCode}
-                          onChange={() => setSelectedRate(rate)}
-                          className="accent-[var(--primary)]"
-                        />
-                        <span>
-                          <span className="block text-sm font-medium text-foreground">{rate.serviceName}</span>
-                          {rate.transitDays != null && (
-                            <span className="block text-xs text-foreground/50">
-                              Estimated {rate.transitDays} business day{rate.transitDays === 1 ? "" : "s"}
-                            </span>
-                          )}
-                        </span>
-                      </span>
-                      <span className="text-sm font-semibold text-foreground">
-                        {formatPrice(rate.price, currency)}
-                      </span>
-                    </label>
-                  ))}
+                <div
+                  className={`flex items-center justify-between rounded-lg border px-4 py-3 ${
+                    deliveryFee === 0
+                      ? "border-green-200 bg-green-50"
+                      : "border-primary bg-primary/5"
+                  }`}
+                >
+                  <span>
+                    <span className="block text-sm font-medium text-foreground">
+                      {shippingServiceName}
+                    </span>
+                    <span className="block text-xs text-foreground/50 mt-0.5">
+                      {deliveryFee === 0
+                        ? `Free delivery on orders of ${formatWholePrice(storeSettings.free_delivery_threshold, currency)} or more`
+                        : `Add ${formatPrice(freeDeliveryGap, currency)} more for free delivery`}
+                    </span>
+                  </span>
+                  <span
+                    className={`text-sm font-semibold ${
+                      deliveryFee === 0 ? "text-green-600" : "text-foreground"
+                    }`}
+                  >
+                    {deliveryFee === 0 ? "FREE" : formatPrice(deliveryFee, currency)}
+                  </span>
                 </div>
               </div>
               )}
@@ -1381,7 +1338,7 @@ export default function CheckoutPage() {
                 <span className="text-foreground/60">
                   {fulfillmentMethod === "store_pickup"
                     ? "Pickup (in store)"
-                    : `Delivery (${selectedRate?.serviceName || "—"})`}
+                    : `Delivery (${shippingServiceName})`}
                 </span>
                 <span
                   className={
@@ -1395,9 +1352,18 @@ export default function CheckoutPage() {
                     : formatPrice(deliveryFee, currency)}
                 </span>
               </div>
-              {fulfillmentMethod === "shipping" && !selectedRate && (
-                <p className="text-xs text-foreground/50">
-                  Delivery is calculated from live Canada Post rates for your address.
+              {fulfillmentMethod === "shipping" && deliveryFee > 0 && (
+                <p className="text-xs text-foreground/60 bg-muted rounded-lg px-3 py-2">
+                  Add{" "}
+                  <span className="font-semibold text-primary">
+                    {formatPrice(freeDeliveryGap, currency)}
+                  </span>{" "}
+                  more to get free delivery
+                </p>
+              )}
+              {fulfillmentMethod === "shipping" && deliveryFee === 0 && (
+                <p className="text-xs text-green-700">
+                  You&apos;ve unlocked free delivery on this order.
                 </p>
               )}
             </div>

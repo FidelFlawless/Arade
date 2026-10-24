@@ -10,9 +10,9 @@ export default function AdminSettingsPage() {
     store_phone: "+1 (437) 566-2773",
     store_address: "Ontario\nCanada",
     business_hours: "Mon - Fri: 9:00 AM - 6:00 PM EST\nSat: 10:00 AM - 4:00 PM EST\nSun: Closed",
-    free_delivery_threshold: "180",
-    delivery_fee_cad: "20",
-    delivery_fee_usd: "14.29",
+    free_delivery_threshold: "200",
+    delivery_fee_cad: "40",
+    delivery_fee_usd: "40",
     tax_rate: "0",
   });
   const [loading, setLoading] = useState(true);
@@ -151,6 +151,11 @@ export default function AdminSettingsPage() {
         {/* Delivery Settings */}
         <div className="card">
           <h2 className="text-lg font-semibold text-foreground mb-4">Delivery Settings</h2>
+          <p className="text-sm text-foreground/60 mb-4">
+            Delivery is a flat fee. Orders below the free-delivery threshold are charged the
+            fee for the customer&apos;s currency; Canada Post is used for labels and tracking, not
+            for pricing.
+          </p>
           <div className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-foreground mb-2">Free Delivery Threshold ($)</label>
@@ -161,7 +166,10 @@ export default function AdminSettingsPage() {
                 className="w-full px-4 py-2.5 border border-border rounded-lg text-sm outline-none"
                 min="0"
               />
-              <p className="text-xs text-foreground/50 mt-1">Orders above this amount get free delivery</p>
+              <p className="text-xs text-foreground/50 mt-1">
+                Orders at or above this amount ship free. The same number applies to both
+                currencies (e.g. C$200 and US$200).
+              </p>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>

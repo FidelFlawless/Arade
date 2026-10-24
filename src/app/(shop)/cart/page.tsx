@@ -1,12 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Trash2, Plus, Minus, ShoppingBag, ArrowLeft, Loader2, Package, Lock, Truck } from "lucide-react";
 import { useCart } from "@/components/providers/CartProvider";
-import { formatPrice, calculateDeliveryFee } from "@/lib/utils";
-import { FREE_DELIVERY_THRESHOLD } from "@/lib/constants";
+import { formatPrice, formatWholePrice, calculateDeliveryFee } from "@/lib/utils";
+import {
+  DEFAULT_SHIPPING_SETTINGS,
+  freeDeliveryRemaining,
+  resolveShippingSettings,
+  type ShippingSettings,
+} from "@/lib/shipping";
 import BackButton from "@/components/ui/BackButton";
 
 export default function CartPage() {
@@ -14,6 +19,21 @@ export default function CartPage() {
   const { items: cartItems, removeFromCart, updateQuantity } = useCart();
   const [country, setCountry] = useState<"CA" | "US">("CA");
   const [updating, setUpdating] = useState<string | null>(null);
+  // Flat delivery settings from Admin -> Settings (defaults match constants).
+  const [shipping, setShipping] = useState<ShippingSettings>(DEFAULT_SHIPPING_SETTINGS);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/settings")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!cancelled && data) setShipping(resolveShippingSettings(data));
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const currency = country === "CA" ? "CAD" : "USD";
   const priceKey = currency === "CAD" ? "price_cad" : "price_usd";
@@ -22,7 +42,11 @@ export default function CartPage() {
     (sum, item) => sum + item[priceKey] * item.quantity,
     0
   );
-  const deliveryFee = calculateDeliveryFee(subtotal, currency);
+  const deliveryFee = calculateDeliveryFee(subtotal, currency, shipping);
+  const freeDeliveryGap = freeDeliveryRemaining(subtotal, shipping);
+  const freeDeliveryProgress = shipping.freeDeliveryThreshold > 0
+    ? Math.min(100, Math.round((subtotal / shipping.freeDeliveryThreshold) * 100))
+    : 0;
   const total = subtotal + deliveryFee;
 
   const handleUpdateQuantity = async (itemId: string, newQuantity: number) => {
@@ -188,10 +212,25 @@ export default function CartPage() {
                     : formatPrice(deliveryFee, currency)}
                 </span>
               </div>
-              {deliveryFee > 0 && (
-                <p className="text-xs text-foreground/50">
-                  Free delivery on orders over{" "}
-                  {formatPrice(FREE_DELIVERY_THRESHOLD, currency)}
+              {deliveryFee > 0 ? (
+                <div className="space-y-2 rounded-lg bg-muted px-3 py-2.5">
+                  <p className="text-xs text-foreground/70">
+                    Add{" "}
+                    <span className="font-semibold text-primary">
+                      {formatPrice(freeDeliveryGap, currency)}
+                    </span>{" "}
+                    more to get FREE delivery
+                  </p>
+                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-border">
+                    <div
+                      className="h-full rounded-full bg-primary transition-all duration-300"
+                      style={{ width: `${freeDeliveryProgress}%` }}
+                    />
+                  </div>
+                </div>
+              ) : (
+                <p className="text-xs text-green-700">
+                  You&apos;ve unlocked free delivery on this order.
                 </p>
               )}
             </div>
@@ -216,7 +255,7 @@ export default function CartPage() {
             <div className="mt-6 pt-4 border-t border-border">
               <div className="flex items-center justify-center gap-4 text-xs text-foreground/50">
                 <span className="flex items-center gap-1"><Lock className="w-3 h-3" /> Secure Checkout</span>
-                <span className="flex items-center gap-1"><Truck className="w-3 h-3" /> Free Shipping $180+</span>
+                <span className="flex items-center gap-1"><Truck className="w-3 h-3" /> Free Shipping {formatWholePrice(shipping.freeDeliveryThreshold, currency)}+</span>
               </div>
             </div>
           </div>

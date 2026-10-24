@@ -34,10 +34,18 @@ describe("Arade utility rules", () => {
     expect(isValidShippingRegion("US", "ON")).toBe(false);
   });
 
-  it("calculates delivery fees at the configured threshold", () => {
-    expect(calculateDeliveryFee(179.99, "CAD")).toBe(20);
-    expect(calculateDeliveryFee(180, "CAD")).toBe(0);
-    expect(calculateDeliveryFee(50, "USD")).toBe(14.29);
+  it("calculates the flat delivery fee at the configured threshold", () => {
+    expect(calculateDeliveryFee(199.99, "CAD")).toBe(40);
+    expect(calculateDeliveryFee(200, "CAD")).toBe(0);
+    expect(calculateDeliveryFee(50, "USD")).toBe(40);
+    // Admin-configured values override the defaults.
+    expect(
+      calculateDeliveryFee(150, "CAD", {
+        freeDeliveryThreshold: 200,
+        deliveryFeeCad: 25,
+        deliveryFeeUsd: 30,
+      })
+    ).toBe(25);
   });
 
   it("formats CAD and USD prices", () => {
